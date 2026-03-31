@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Colink — Diagnóstico de Processos</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<!-- SheetJS para leitura de Excel no browser -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #0d0e11; --surface: #14161b; --surface2: #1c1f27;
+    --border: #252830; --accent: #e8c872; --accent2: #6e9aff;
+    --text: #e8e9ec; --muted: #7a7f8e; --danger: #ff6b6b;
+    --success: #5fcb8e; --user-bubble: #1e2535; --ai-bubble: #191b22;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif;
+    font-size:14px; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+
+  header { display:flex; align-items:center; gap:14px; padding:16px 24px;
+    border-bottom:1px solid var(--border); background:var(--surface); flex-shrink:0; }
+  .logo-mark { width:36px; height:36px; background:white; border-radius:8px;
+    padding:3px; overflow:hidden; flex-shrink:0; }
+  .logo-mark img { width:100%; height:100%; object-fit:contain; display:block; }
+  .header-text h1 { font-family:'DM Serif Display',serif; font-size:17px; line-height:1.2; }
+  .header-text p { font-size:11px; color:var(--muted); letter-spacing:.06em; text-transform:uppercase; }
+  .status-dot { margin-left:auto; display:flex; align-items:center; gap:6px;
+    font-size:11px; color:var(--muted); }
+  .dot { width:6px; height:6px; border-radius:50%; background:var(--success); animation:pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  .steps-bar { display:flex; padding:0 24px; background:var(--surface);
+    border-bottom:1px solid var(--border); overflow-x:auto; flex-shrink:0; scrollbar-width:none; }
+  .steps-bar::-webkit-scrollbar { display:none; }
+  .step-chip { padding:8px 16px; font-size:11px; color:var(--muted); white-space:nowrap;
+    border-bottom:2px solid transparent; transition:all .2s; letter-spacing:.04em; }
+  .step-chip.active { color:var(--accent); border-bottom-color:var(--accent); font-weight:500; }
+  .step-chip.done { color:var(--success); border-bottom-color:var(--success); }
+
+  #chat { flex:1; overflow-y:auto; padding:28px 24px; display:flex;
+    flex-direction:column; gap:20px; scroll-behavior:smooth; }
+  #chat::-webkit-scrollbar { width:4px; }
+  #chat::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+
+  .msg { display:flex; flex-direction:column; max-width:82%; animation:fadeIn .3s ease; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+  .msg.user { align-self:flex-end; align-items:flex-end; }
+  .msg.ai { align-self:flex-start; align-items:flex-start; }
+  .msg-label { font-size:10px; color:var(--muted); margin-bottom:5px;
+    letter-spacing:.06em; text-transform:uppercase; font-weight:500; }
+  .msg.ai .msg-label { color:var(--accent); }
+  .bubble { padding:14px 18px; border-radius:14px; line-height:1.65; font-size:13.5px; }
+  .msg.user .bubble { background:var(--user-bubble); border-bottom-right-radius:4px;
+    border:1px solid #2a2f3d; }
+  .msg.ai .bubble { background:var(--ai-bubble); border-bottom-left-radius:4px;
+    border:1px solid var(--border); }
+  .bubble p { margin-bottom:10px; }
+  .bubble p:last-child { margin-bottom:0; }
+  .bubble strong { color:var(--accent); font-weight:600; }
+  .bubble em { color:var(--accent2); font-style:normal; font-weight:500; }
+  .bubble table { border-collapse:collapse; width:100%; margin:10px 0; font-size:12.5px; }
+  .bubble th { background:var(--surface2); color:var(--muted); padding:7px 10px;
+    text-align:left; font-weight:500; font-size:11px; letter-spacing:.04em; text-transform:uppercase; }
+  .bubble td { padding:7px 10px; border-top:1px solid var(--border); }
+  .bubble ul,.bubble ol { padding-left:18px; margin:8px 0; }
+  .bubble li { margin-bottom:5px; line-height:1.5; }
+
+  /* Preview de arquivo anexado */
+  .attachment-preview {
+    display:flex; align-items:center; gap:10px; margin-bottom:8px;
+    background:var(--surface2); border:1px solid var(--border);
+    border-radius:10px; padding:10px 14px; max-width:100%;
+  }
+  .attachment-preview .att-icon { font-size:20px; flex-shrink:0; }
+  .attachment-preview .att-info { flex:1; min-width:0; }
+  .attachment-preview .att-name { font-size:12px; font-weight:600; color:var(--text);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .attachment-preview .att-meta { font-size:11px; color:var(--muted); margin-top:2px; }
+  .attachment-preview .att-remove { background:none; border:none; color:var(--muted);
+    cursor:pointer; font-size:16px; padding:0 4px; flex-shrink:0; }
+  .attachment-preview .att-remove:hover { color:var(--danger); }
+
+  /* Imagem no chat */
+  .bubble img.chat-img { max-width:260px; border-radius:8px; margin-top:8px; display:block; }
+
+  .thinking { display:flex; align-items:center; gap:8px; padding:12px 18px;
+    background:var(--ai-bubble); border:1px solid var(--border);
+    border-radius:14px; border-bottom-left-radius:4px; font-size:12px; color:var(--muted); }
+  .dots { display:flex; gap:4px; }
+  .dots span { width:5px; height:5px; border-radius:50%; background:var(--accent);
+    animation:bounce 1.2s infinite; }
+  .dots span:nth-child(2){animation-delay:.2s} .dots span:nth-child(3){animation-delay:.4s}
+  @keyframes bounce { 0%,60%,100%{transform:translateY(0);opacity:.5} 30%{transform:translateY(-5px);opacity:1} }
+
+  /* Input area */
+  .input-area { padding:12px 24px 18px; background:var(--surface);
+    border-top:1px solid var(--border); flex-shrink:0; }
+
+  /* Barra de anexo pendente */
+  #pendingAttachment { display:none; margin-bottom:8px; }
+
+  .input-row { display:flex; gap:10px; align-items:flex-end; }
+
+  /* Botão de clipe */
+  #attachBtn {
+    width:48px; height:48px; border-radius:12px; background:var(--surface2);
+    border:1px solid var(--border); cursor:pointer; display:flex; align-items:center;
+    justify-content:center; transition:all .2s; flex-shrink:0; color:var(--muted);
+    font-size:20px;
+  }
+  #attachBtn:hover { border-color:var(--accent); color:var(--accent); }
+
+  #inputBox { flex:1; background:var(--surface2); border:1px solid var(--border);
+    border-radius:12px; padding:12px 16px; color:var(--text);
+    font-family:'DM Sans',sans-serif; font-size:13.5px; resize:none;
+    min-height:48px; max-height:140px; outline:none; transition:border-color .2s;
+    line-height:1.5; overflow-y:auto; }
+  #inputBox:focus { border-color:var(--accent); }
+  #inputBox::placeholder { color:var(--muted); }
+
+  #sendBtn { width:48px; height:48px; border-radius:12px; background:var(--accent);
+    border:none; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    transition:all .2s; flex-shrink:0; }
+  #sendBtn:hover { background:#f0d484; transform:scale(1.04); }
+  #sendBtn:active { transform:scale(.97); }
+  #sendBtn:disabled { opacity:.4; cursor:default; transform:none; }
+  #sendBtn svg { width:18px; height:18px; fill:#0d0e11; }
+
+  .input-hint { font-size:10.5px; color:var(--muted); margin-top:8px; }
+
+  .error-bubble { background:rgba(255,107,107,.08); border:1px solid rgba(255,107,107,.2);
+    color:var(--danger); font-size:12.5px; padding:10px 14px; border-radius:10px; margin-top:8px; }
+
+  ::-webkit-scrollbar { width:5px; }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-mark">
+    <img src="data:image/png;base64,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" alt="Colink logo" />
+  </div>
+  <div class="header-text">
+    <h1>Colink — Diagnóstico de Processos</h1>
+    <p>Diagnóstico operacional com IA · 10 Steps Colink</p>
+  </div>
+  <div class="status-dot"><div class="dot"></div>Ativo</div>
+</header>
+
+<div class="steps-bar" id="stepsBar">
+  <div class="step-chip active" id="s1">1 · Inventário</div>
+  <div class="step-chip" id="s2">2 · Entrevista</div>
+  <div class="step-chip" id="s3">3 · Análise</div>
+  <div class="step-chip" id="s4">4 · AS-IS / TO-BE</div>
+  <div class="step-chip" id="s5">5 · Roadmap</div>
+</div>
+
+<div id="chat"></div>
+
+<div class="input-area">
+  <!-- Preview do arquivo pendente -->
+  <div id="pendingAttachment"></div>
+
+  <div class="input-row">
+    <!-- Botão clipe -->
+    <button id="attachBtn" title="Anexar arquivo" onclick="document.getElementById('fileInput').click()">
+      📎
+    </button>
+    <input type="file" id="fileInput" style="display:none"
+      accept=".jpg,.jpeg,.png,.gif,.webp,.xlsx,.xls,.csv,.pdf,.docx,.doc,.txt"
+      onchange="handleFileSelect(this)">
+
+    <textarea id="inputBox"
+      placeholder="Descreva o processo, cole um texto ou envie um arquivo..."
+      rows="1"></textarea>
+
+    <button id="sendBtn" onclick="send()">
+      <svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+    </button>
+  </div>
+  <div class="input-hint">Enter para enviar · Shift+Enter para nova linha · 📎 para anexar arquivo</div>
+</div>
+
+<script>
+const SYSTEM_PROMPT = `Você é o consultor de IA da Colink Business Consulting, especializado em auditoria e mapeamento de processos empresariais.
+
+Seu trabalho segue rigorosamente a metodologia Colink:
+
+## OS 10 STEPS PARA MELHORIA E AUTOMAÇÃO
+
+| Step | Pergunta | SIM | NÃO |
+|---|---|---|---|
+| 1 | O processo está mapeado como realmente ocorre? | → Step 2 | → Mapear o processo real |
+| 2 | O processo é estável? | → Step 3 | → Estabilizar o processo |
+| 3 | Os dados são íntegros e consistentes? | → Step 4 | → Elevar maturidade dos dados |
+| 4 | O gargalo está identificado? | → Step 5 | → Identificar o gargalo |
+| 5 | Existe padrão operacional definido? | → Step 6 | → Padronizar o processo |
+| 6 | Há oportunidades reais de melhoria? | → Melhorar | → Step 7 |
+| 7 | O processo é repetitivo e com baixa ambiguidade? | → Step 8 | → Reduzir ambiguidade |
+| 8 | Automação por regras ou por agentes de IA? | RPA/Workflow | → Step 9 |
+| 9 | Os limites de autonomia dos agentes estão definidos? | → Step 10 | → Definir autonomia |
+| 10 | A governança pós-automação está preparada? | → Implementar | → Estabelecer governança |
+
+## FLUXO DE TRABALHO
+
+1. **Inventário** — Pergunte que arquivos ou contexto o usuário tem
+2. **Entrevista diagnóstica** — Conduza os 10 Steps com perguntas de aprofundamento
+3. **Análise** — Identifique tipo de processo, ferramentas, responsáveis, volumes
+4. **AS-IS / TO-BE** — Mapeie situação atual e proponha melhorias com IA
+5. **Roadmap** — Curto (0-3m), Médio (3-6m), Longo prazo (6-12m)
+
+## FRAMEWORK DE IA APLICADA (COLINK)
+
+**Princípio central:** Sem processo estruturado, IA não tem onde atuar. A sequência correta é: estruturar → padronizar → digitalizar → automatizar → agentes de IA.
+
+**Onde IA funciona bem:**
+- Fórmulas e regras claras
+- Processos repetitivos
+- Resultado probabilístico aceitável
+- Baixa ambiguidade
+- Tarefas descritas em passos
+
+**Onde IA tem limitações:**
+- Cálculos fiscais exatos (margem zero)
+- Decisões médicas determinísticas
+- Julgamento subjetivo complexo
+- Alta ambiguidade contextual
+
+**Decisão: RPA vs. Agentes de IA**
+- RPA/Workflow: regras fixas, entradas padronizadas, 1 resposta correta
+- Agentes IA: variações, texto livre, "80% correto" já gera valor, alto volume
+
+**Níveis de maturidade:**
+- NÍVEL 0 CAÓTICO → Mapear o processo
+- NÍVEL 1 DEFINIDO → Padronizar + POP
+- NÍVEL 2 PADRONIZADO → Identificar melhorias
+- NÍVEL 3 DIGITALIZADO → Automação por regras
+- NÍVEL 4 AUTOMATIZADO → Agentes de IA
+- NÍVEL 5 INTELIGENTE → Otimizar e expandir
+
+## TOM E ESTILO
+
+- Seja objetivo, consultivo e direto
+- Use tabelas para estruturar diagnósticos
+- Identifique o Step em que o processo está
+- Sempre proponha next steps concretos
+- Responda em português (Brasil)
+- Quando identificar oportunidade de IA, seja específico sobre tipo (RPA vs. Agente) e benefício
+- Não invente dados — pergunte quando não tiver informação
+
+## INÍCIO
+
+Ao iniciar, cumprimente brevemente e pergunte:
+1. Qual empresa/setor?
+2. Qual processo quer auditar?
+3. Tem arquivos ou documentação para compartilhar?
+
+**REGRA CRÍTICA:** Faça APENAS UMA pergunta por mensagem. Nunca liste múltiplas perguntas de uma vez. Espere sempre a resposta antes de fazer a próxima.
+
+Ao iniciar: cumprimente brevemente e pergunte APENAS qual empresa/setor.
+Após resposta: pergunte APENAS qual processo quer auditar.
+Após resposta: pergunte APENAS se tem arquivos ou documentação.
+Depois: siga a entrevista dos 10 Steps, uma pergunta por vez.`;
+
+let history = [];
+let currentStep = 1;
+let isLoading = false;
+let pendingFile = null; // { type, name, size, data } 
+
+const chat = document.getElementById('chat');
+const inputBox = document.getElementById('inputBox');
+const sendBtn = document.getElementById('sendBtn');
+
+// ─── STEPS ───────────────────────────────────────────────────────────────────
+function updateSteps(step) {
+  currentStep = step;
+  for (let i = 1; i <= 5; i++) {
+    const el = document.getElementById('s' + i);
+    el.className = 'step-chip';
+    if (i < step) el.classList.add('done');
+    else if (i === step) el.classList.add('active');
+  }
+}
+
+// ─── MESSAGES ────────────────────────────────────────────────────────────────
+function addMessage(role, content, imgSrc) {
+  const msg = document.createElement('div');
+  msg.className = `msg ${role}`;
+  const label = document.createElement('div');
+  label.className = 'msg-label';
+  label.textContent = role === 'user' ? 'Você' : 'Colink IA';
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+
+  if (imgSrc) {
+    const img = document.createElement('img');
+    img.src = imgSrc;
+    img.className = 'chat-img';
+    bubble.appendChild(img);
+    if (content) {
+      const p = document.createElement('p');
+      p.style.marginTop = '8px';
+      p.innerHTML = formatMarkdown(content);
+      bubble.appendChild(p);
+    }
+  } else {
+    bubble.innerHTML = formatMarkdown(content);
+  }
+
+  msg.appendChild(label);
+  msg.appendChild(bubble);
+  chat.appendChild(msg);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+// ─── MARKDOWN ────────────────────────────────────────────────────────────────
+function formatMarkdown(text) {
+  text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+  text = text.replace(/^### (.+)$/gm, '<p style="font-size:13px;font-weight:600;color:var(--accent);margin-top:14px;margin-bottom:6px;letter-spacing:.04em;text-transform:uppercase;">$1</p>');
+  text = text.replace(/^## (.+)$/gm, '<p style="font-family:\'DM Serif Display\',serif;font-size:16px;margin-top:14px;margin-bottom:8px;">$1</p>');
+  text = text.replace(/^# (.+)$/gm, '<p style="font-family:\'DM Serif Display\',serif;font-size:18px;color:var(--accent);margin-bottom:10px;">$1</p>');
+  text = parseTable(text);
+  text = text.replace(/^[-•] (.+)$/gm, '<li>$1</li>');
+  text = text.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+  text = text.replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,.07);padding:2px 6px;border-radius:4px;font-family:monospace;font-size:12px;">$1</code>');
+  text = text.replace(/^---$/gm, '<hr style="border:none;border-top:1px solid var(--border);margin:12px 0;">');
+  text = text.split('\n\n').map(p => {
+    if (p.trim() && !p.includes('<table') && !p.includes('<ul') && !p.includes('<p ') && !p.includes('<hr')) {
+      return `<p>${p.replace(/\n/g, '<br>')}</p>`;
+    }
+    return p;
+  }).join('\n');
+  return text;
+}
+
+function parseTable(text) {
+  const lines = text.split('\n');
+  let result = [], inTable = false, tableHtml = '';
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim().startsWith('|')) {
+      if (!inTable) {
+        inTable = true;
+        tableHtml = '<table><thead><tr>';
+        line.split('|').filter(c => c.trim()).forEach(h => { tableHtml += `<th>${h.trim()}</th>`; });
+        tableHtml += '</tr></thead><tbody>';
+      } else if (line.includes('---')) { continue; }
+      else {
+        tableHtml += '<tr>';
+        line.split('|').slice(1, -1).forEach(c => { tableHtml += `<td>${fmtInline(c.trim())}</td>`; });
+        tableHtml += '</tr>';
+      }
+    } else {
+      if (inTable) { tableHtml += '</tbody></table>'; result.push(tableHtml); inTable = false; tableHtml = ''; }
+      result.push(line);
+    }
+  }
+  if (inTable) { tableHtml += '</tbody></table>'; result.push(tableHtml); }
+  return result.join('\n');
+}
+
+function fmtInline(t) {
+  t = t.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  t = t.replace(/✅/g, '<span style="color:var(--success)">✅</span>');
+  t = t.replace(/❌/g, '<span style="color:var(--danger)">❌</span>');
+  t = t.replace(/→/g, '<span style="color:var(--accent)">→</span>');
+  return t;
+}
+
+// ─── THINKING ────────────────────────────────────────────────────────────────
+function showThinking() {
+  const msg = document.createElement('div');
+  msg.className = 'msg ai'; msg.id = 'thinking';
+  const label = document.createElement('div');
+  label.className = 'msg-label'; label.textContent = 'Colink IA';
+  const t = document.createElement('div');
+  t.className = 'thinking';
+  t.innerHTML = '<div class="dots"><span></span><span></span><span></span></div>Analisando...';
+  msg.appendChild(label); msg.appendChild(t);
+  chat.appendChild(msg); chat.scrollTop = chat.scrollHeight;
+}
+function removeThinking() { const t = document.getElementById('thinking'); if (t) t.remove(); }
+
+// ─── FILE HANDLING ────────────────────────────────────────────────────────────
+const FILE_ICONS = {
+  image: '🖼️', excel: '📊', pdf: '📄', word: '📝', text: '📋', unknown: '📎'
+};
+
+function getFileCategory(name) {
+  const ext = name.split('.').pop().toLowerCase();
+  if (['jpg','jpeg','png','gif','webp'].includes(ext)) return 'image';
+  if (['xlsx','xls','csv'].includes(ext)) return 'excel';
+  if (ext === 'pdf') return 'pdf';
+  if (['docx','doc'].includes(ext)) return 'word';
+  if (ext === 'txt') return 'text';
+  return 'unknown';
+}
+
+function formatBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+  return (b/1048576).toFixed(1) + ' MB';
+}
+
+async function handleFileSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+
+  const category = getFileCategory(file.name);
+  const icon = FILE_ICONS[category];
+  showPendingAttachment(file.name, formatBytes(file.size), icon, category);
+
+  // Lê o arquivo conforme o tipo
+  if (category === 'image') {
+    const b64 = await readAsBase64(file);
+    pendingFile = { type: 'image', name: file.name, size: file.size, data: b64, mimeType: file.type };
+  } else if (category === 'excel') {
+    const text = await readExcelAsText(file);
+    pendingFile = { type: 'text_file', name: file.name, size: file.size, data: text };
+  } else {
+    // PDF, Word, TXT → envia para o servidor extrair
+    const b64 = await readAsBase64(file);
+    pendingFile = { type: 'server_extract', name: file.name, size: file.size, data: b64, mimeType: file.type };
+  }
+}
+
+function readAsBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = () => rej(new Error('Erro ao ler arquivo'));
+    r.readAsDataURL(file);
+  });
+}
+
+// Lê Excel com SheetJS, extrai dados E fórmulas
+async function readExcelAsText(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, { type: 'array', cellFormula: true, cellNF: true });
+        let output = `=== ARQUIVO EXCEL: ${file.name} ===\n`;
+        output += `Abas: ${wb.SheetNames.join(', ')}\n\n`;
+
+        wb.SheetNames.forEach(sheetName => {
+          const ws = wb.Sheets[sheetName];
+          const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+          output += `--- ABA: ${sheetName} (${range.e.r + 1} linhas x ${range.e.c + 1} colunas) ---\n`;
+
+          // Dados como CSV
+          const csv = XLSX.utils.sheet_to_csv(ws, { blankrows: false });
+          output += `DADOS:\n${csv}\n\n`;
+
+          // Fórmulas
+          const formulas = [];
+          Object.keys(ws).forEach(cell => {
+            if (cell.startsWith('!')) return;
+            const c = ws[cell];
+            if (c.f) formulas.push(`${cell}: =${c.f}`);
+          });
+          if (formulas.length > 0) {
+            output += `FÓRMULAS (${formulas.length} encontradas):\n`;
+            output += formulas.join('\n') + '\n\n';
+          }
+        });
+
+        res(output);
+      } catch(err) {
+        rej(err);
+      }
+    };
+    r.onerror = () => rej(new Error('Erro ao ler Excel'));
+    r.readAsArrayBuffer(file);
+  });
+}
+
+function showPendingAttachment(name, size, icon, category) {
+  const container = document.getElementById('pendingAttachment');
+  container.style.display = 'block';
+  container.innerHTML = `
+    <div class="attachment-preview">
+      <span class="att-icon">${icon}</span>
+      <div class="att-info">
+        <div class="att-name">${name}</div>
+        <div class="att-meta">${size} · ${category}</div>
+      </div>
+      <button class="att-remove" onclick="clearPendingAttachment()" title="Remover">✕</button>
+    </div>`;
+}
+
+function clearPendingAttachment() {
+  pendingFile = null;
+  const container = document.getElementById('pendingAttachment');
+  container.style.display = 'none';
+  container.innerHTML = '';
+}
+
+// ─── SEND ─────────────────────────────────────────────────────────────────────
+async function send() {
+  const text = inputBox.value.trim();
+  if ((!text && !pendingFile) || isLoading) return;
+
+  inputBox.value = '';
+  inputBox.style.height = 'auto';
+  isLoading = true;
+  sendBtn.disabled = true;
+
+  const file = pendingFile;
+  clearPendingAttachment();
+
+  // Monta mensagem visual no chat
+  if (file && file.type === 'image') {
+    addMessage('user', text, file.data);
+  } else if (file) {
+    addMessage('user', (text || '') + (text ? '\n\n' : '') + `📎 *${file.name}* anexado`);
+  } else {
+    addMessage('user', text);
+  }
+
+  // Monta mensagem para a API
+  let userMsgContent;
+
+  if (file && file.type === 'image') {
+    // Visão: imagem + texto
+    const base64Data = file.data.split(',')[1];
+    userMsgContent = [
+      { type: 'image_url', image_url: { url: `data:${file.mimeType};base64,${base64Data}`, detail: 'high' } }
+    ];
+    if (text) userMsgContent.push({ type: 'text', text });
+    else userMsgContent.push({ type: 'text', text: 'Analise esta imagem no contexto do diagnóstico de processos.' });
+
+  } else if (file && file.type === 'text_file') {
+    // Excel já extraído
+    userMsgContent = (text ? text + '\n\n' : '') +
+      `[ARQUIVO ENVIADO: ${file.name}]\n${file.data}`;
+
+  } else if (file && file.type === 'server_extract') {
+    // PDF/Word: extrai no servidor primeiro
+    showThinking();
+    try {
+      const resp = await fetch('/api/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: file.name, data: file.data, mimeType: file.mimeType })
+      });
+      const result = await resp.json();
+      removeThinking();
+      userMsgContent = (text ? text + '\n\n' : '') +
+        `[ARQUIVO ENVIADO: ${file.name}]\n${result.text}`;
+    } catch(e) {
+      removeThinking();
+      userMsgContent = (text ? text + '\n\n' : '') +
+        `[Arquivo ${file.name} enviado mas não foi possível extrair o conteúdo. Peça ao usuário para copiar o texto manualmente.]`;
+    }
+  } else {
+    userMsgContent = text;
+  }
+
+  history.push({ role: 'user', content: userMsgContent });
+  showThinking();
+
+  try {
+    const hasImage = history.length > 0 && Array.isArray(history[history.length-1].content) && history[history.length-1].content.some(c => c.type === 'image_url');
+    const messages = [{ role: 'system', content: SYSTEM_PROMPT }, ...history];
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ max_tokens: 1500, messages, model: 'gpt-4o-mini' })
+    });
+
+    const data = await response.json();
+    removeThinking();
+
+    if (data.error) {
+      const errDiv = document.createElement('div');
+      errDiv.className = 'error-bubble';
+      errDiv.textContent = 'Erro: ' + data.error.message;
+      chat.appendChild(errDiv);
+      history.pop();
+    } else {
+      const reply = data.choices[0].message.content;
+      history.push({ role: 'assistant', content: reply });
+      addMessage('ai', reply);
+
+      const lr = reply.toLowerCase();
+      if (lr.includes('as-is') || lr.includes('situação atual')) updateSteps(4);
+      else if (lr.includes('step') || lr.includes('processo é')) updateSteps(3);
+      else if (lr.includes('como o processo') || lr.includes('qual o volume')) updateSteps(2);
+      else if (lr.includes('roadmap') || lr.includes('próximos passos')) updateSteps(5);
+    }
+  } catch (err) {
+    removeThinking();
+    const errDiv = document.createElement('div');
+    errDiv.className = 'error-bubble';
+    errDiv.textContent = 'Falha na conexão. Verifique o servidor e tente novamente.';
+    chat.appendChild(errDiv);
+    chat.scrollTop = chat.scrollHeight;
+    history.pop();
+  }
+
+  isLoading = false;
+  sendBtn.disabled = false;
+  inputBox.focus();
+}
+
+// ─── INPUT EVENTS ─────────────────────────────────────────────────────────────
+inputBox.addEventListener('input', () => {
+  inputBox.style.height = 'auto';
+  inputBox.style.height = Math.min(inputBox.scrollHeight, 140) + 'px';
+});
+inputBox.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+});
+
+// Drag & drop
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    const fakeInput = { files: [file], value: '' };
+    handleFileSelect(fakeInput);
+  }
+});
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+async function init() {
+  isLoading = true; sendBtn.disabled = true; showThinking();
+  try {
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        max_tokens: 400,
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: 'Inicie a sessão de diagnóstico.' }
+        ]
+      })
+    });
+    const data = await response.json();
+    removeThinking();
+    if (!data.error) {
+      const reply = data.choices[0].message.content;
+      history.push({ role: 'assistant', content: reply });
+      addMessage('ai', reply);
+    }
+  } catch(e) {
+    removeThinking();
+    addMessage('ai', 'Olá! Sou o consultor de IA da **Colink**. Vamos iniciar o diagnóstico.\n\nQual empresa e setor você representa?');
+  }
+  isLoading = false; sendBtn.disabled = false;
+}
+
+init();
+</script>
+</body>
+</html>

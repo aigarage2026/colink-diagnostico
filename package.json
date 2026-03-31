@@ -1,0 +1,15 @@
+{
+  "name": "colink-diagnostico",
+  "version": "1.0.0",
+  "description": "Colink — Diagnostico de Processos com IA",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "node-fetch": "^2.7.0",
+    "pdf-parse": "^1.1.1",
+    "mammoth": "^1.6.0"
+  }
+}
