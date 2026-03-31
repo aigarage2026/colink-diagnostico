@@ -5,7 +5,7 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY; // chave configurada no Railway como variavel de ambiente
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 app.use(express.json({ limit: '20mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -13,15 +13,14 @@ app.use(express.static(path.join(__dirname, 'public')));
 // /api/chat — proxy OpenAI
 app.post('/api/chat', async (req, res) => {
   try {
-    const { messages, max_tokens, model } = req.body;
-    const safeModel = 'gpt-4o-mini'; // sempre mini
+    const { messages, max_tokens } = req.body;
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${OPENAI_API_KEY}`
       },
-      body: JSON.stringify({ model: safeModel, max_tokens: max_tokens || 1500, messages })
+      body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: max_tokens || 1500, messages })
     });
     const data = await response.json();
     res.json(data);
@@ -33,7 +32,7 @@ app.post('/api/chat', async (req, res) => {
 
 // /api/extract — extrai texto de PDF e Word
 app.post('/api/extract', async (req, res) => {
-  const { name, data, mimeType } = req.body;
+  const { name, data } = req.body;
   try {
     const base64 = data.includes(',') ? data.split(',')[1] : data;
     const buffer = Buffer.from(base64, 'base64');
@@ -61,6 +60,7 @@ app.post('/api/extract', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Colink rodando em http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Colink rodando na porta ${PORT}`);
 });
+
