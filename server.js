@@ -1,107 +1,104 @@
 const express = require('express');
 const fetch = require('node-fetch');
 const path = require('path');
-const fs = require('fs');
+const { MongoClient } = require('mongodb');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-
-// Pasta onde as sessões ficam salvas
-const SESSIONS_DIR = path.join(__dirname, 'sessions');
-if (!fs.existsSync(SESSIONS_DIR)) fs.mkdirSync(SESSIONS_DIR, { recursive: true });
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://colink:Colink2026@cluster0.j9nw5px.mongodb.net/?appName=Cluster0';
 
 app.use(express.json({ limit: '20mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ── Helpers de sessão ─────────────────────────────────────────────────────────
+// ── Conexão MongoDB ───────────────────────────────────────────────────────────
+let db;
 
-function sessionPath(id) {
-  return path.join(SESSIONS_DIR, `${id}.json`);
+async function connectDB() {
+  try {
+    const client = new MongoClient(MONGODB_URI);
+    await client.connect();
+    db = client.db('colink');
+    console.log('MongoDB conectado!');
+  } catch (err) {
+    console.error('Erro ao conectar MongoDB:', err.message);
+    process.exit(1);
+  }
 }
 
-function loadSession(id) {
-  const p = sessionPath(id);
-  if (!fs.existsSync(p)) return null;
-  return JSON.parse(fs.readFileSync(p, 'utf-8'));
+function sessions() {
+  return db.collection('sessions');
 }
 
-function saveSession(session) {
-  session.updatedAt = Date.now();
-  fs.writeFileSync(sessionPath(session.id), JSON.stringify(session, null, 2));
-}
-
-function listSessions() {
-  if (!fs.existsSync(SESSIONS_DIR)) return [];
-  return fs.readdirSync(SESSIONS_DIR)
-    .filter(f => f.endsWith('.json'))
-    .map(f => {
-      try {
-        const s = JSON.parse(fs.readFileSync(path.join(SESSIONS_DIR, f), 'utf-8'));
-        return {
-          id: s.id,
-          code: s.code,
-          clientName: s.clientName,
-          messageCount: s.messages ? s.messages.length : 0,
-          updatedAt: s.updatedAt,
-          createdAt: s.createdAt
-        };
-      } catch(e) { return null; }
-    })
-    .filter(Boolean);
-}
-
-function generateCode(clientName) {
-  // Pega sessões existentes para este cliente e incrementa
-  const existing = listSessions().filter(s =>
-    s.clientName.toLowerCase() === clientName.toLowerCase()
-  );
-  const num = existing.length + 1;
-  return `#${String(num).padStart(3, '0')}`;
-}
-
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
-// ── /api/sessions GET — lista todas as sessões ────────────────────────────────
-app.get('/api/sessions', (req, res) => {
+async function generateCode(clientName) {
+  const count = await sessions().countDocuments({
+    clientName: { $regex: new RegExp(`^${clientName}$`, 'i') }
+  });
+  return `#${String(count + 1).padStart(3, '0')}`;
+}
+
+// ── /api/sessions GET — lista todas ──────────────────────────────────────────
+app.get('/api/sessions', async (req, res) => {
   try {
-    res.json({ sessions: listSessions() });
-  } catch(e) {
+    const list = await sessions()
+      .find({}, { projection: { messages: 0 } })
+      .sort({ updatedAt: -1 })
+      .toArray();
+
+    res.json({ sessions: list.map(s => ({
+      id: s.id,
+      code: s.code,
+      clientName: s.clientName,
+      messageCount: s.messageCount || 0,
+      updatedAt: s.updatedAt,
+      createdAt: s.createdAt
+    }))});
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Erro ao listar sessões.' });
   }
 });
 
-// ── /api/sessions POST — cria nova sessão ────────────────────────────────────
-app.post('/api/sessions', (req, res) => {
+// ── /api/sessions POST — cria nova ────────────────────────────────────────────
+app.post('/api/sessions', async (req, res) => {
   try {
     const { clientName } = req.body;
     if (!clientName || !clientName.trim()) {
       return res.status(400).json({ error: 'Nome do cliente é obrigatório.' });
     }
     const id = generateId();
-    const code = generateCode(clientName.trim());
+    const code = await generateCode(clientName.trim());
     const session = {
       id, code,
       clientName: clientName.trim(),
       messages: [],
+      messageCount: 0,
       createdAt: Date.now(),
       updatedAt: Date.now()
     };
-    saveSession(session);
+    await sessions().insertOne(session);
     res.json({ id, code, clientName: session.clientName });
-  } catch(e) {
-    console.error('Erro ao criar sessão:', e.message);
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Erro ao criar sessão.' });
   }
 });
 
-// ── /api/sessions/:id GET — carrega uma sessão ───────────────────────────────
-app.get('/api/sessions/:id', (req, res) => {
-  const session = loadSession(req.params.id);
-  if (!session) return res.status(404).json({ error: 'Sessão não encontrada.' });
-  res.json(session);
+// ── /api/sessions/:id GET — carrega uma sessão ────────────────────────────────
+app.get('/api/sessions/:id', async (req, res) => {
+  try {
+    const session = await sessions().findOne({ id: req.params.id });
+    if (!session) return res.status(404).json({ error: 'Sessão não encontrada.' });
+    res.json(session);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao carregar sessão.' });
+  }
 });
 
 // ── /api/chat POST — proxy OpenAI + salva mensagens ──────────────────────────
@@ -120,35 +117,38 @@ app.post('/api/chat', async (req, res) => {
 
     const data = await response.json();
 
-    // Salva na sessão se tiver sessionId
+    // Salva no MongoDB se tiver sessionId e não houver erro
     if (sessionId && !data.error) {
-      const session = loadSession(sessionId);
-      if (session) {
-        const reply = data.choices[0].message.content;
-        const userMsg = messages[messages.length - 1];
+      const reply = data.choices[0].message.content;
+      const userMsg = messages[messages.length - 1];
 
-        // Salva mensagem do usuário
-        session.messages.push({
+      const newMessages = [
+        {
           role: 'user',
           content: typeof userMsg.content === 'string' ? userMsg.content : JSON.stringify(userMsg.content),
           displayContent: userDisplayContent || (typeof userMsg.content === 'string' ? userMsg.content : '[arquivo]'),
           timestamp: Date.now()
-        });
-
-        // Salva resposta da IA
-        session.messages.push({
+        },
+        {
           role: 'assistant',
           content: reply,
           displayContent: reply,
           timestamp: Date.now()
-        });
+        }
+      ];
 
-        saveSession(session);
-      }
+      await sessions().updateOne(
+        { id: sessionId },
+        {
+          $push: { messages: { $each: newMessages } },
+          $inc: { messageCount: 2 },
+          $set: { updatedAt: Date.now() }
+        }
+      );
     }
 
     res.json(data);
-  } catch(err) {
+  } catch (err) {
     console.error('Erro /api/chat:', err.message);
     res.status(500).json({ error: { message: 'Erro interno no servidor.' } });
   }
@@ -178,12 +178,15 @@ app.post('/api/extract', async (req, res) => {
     }
 
     res.json({ text: text.slice(0, 30000) });
-  } catch(err) {
+  } catch (err) {
     console.error('Erro /api/extract:', err.message);
     res.json({ text: `[Erro ao extrair ${name}: ${err.message}]` });
   }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Colink rodando na porta ${PORT}`);
+// ── Start ─────────────────────────────────────────────────────────────────────
+connectDB().then(() => {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Colink rodando na porta ${PORT}`);
+  });
 });
