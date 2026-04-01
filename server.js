@@ -15,10 +15,7 @@ const DEFAULT_PRICE_OUTPUT = 0.600;
 app.use(express.json({ limit: '20mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Serve admin panel
-app.get('/admin.html', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
-});
+
 
 // ── MongoDB ───────────────────────────────────────────────────────────────────
 let db;
