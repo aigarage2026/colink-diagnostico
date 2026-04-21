@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Colink — Painel Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:#0d0e11; --surface:#14161b; --surface2:#1c1f27;
+    --border:#252830; --accent:#e8c872; --accent2:#6e9aff;
+    --text:#e8e9ec; --muted:#7a7f8e; --danger:#ff6b6b;
+    --success:#5fcb8e; --warning:#f59e0b;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:"DM Sans",sans-serif;font-size:14px;min-height:100vh;}
+
+  header{display:flex;align-items:center;gap:14px;padding:14px 28px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:10;}
+  .logo-mark{width:32px;height:32px;background:white;border-radius:8px;padding:3px;overflow:hidden;flex-shrink:0;}
+  .logo-mark img{width:100%;height:100%;object-fit:contain;display:block;}
+  .header-title{font-family:"DM Serif Display",serif;font-size:16px;}
+  .header-sub{font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;}
+  .back-btn{margin-left:auto;padding:6px 14px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-family:"DM Sans",sans-serif;font-size:12px;cursor:pointer;text-decoration:none;transition:all .2s;}
+  .back-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+  main{padding:28px;max-width:1200px;margin:0 auto;}
+
+  /* KPI CARDS */
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:28px;}
+  .kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;}
+  .kpi-label{font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;}
+  .kpi-value{font-size:26px;font-weight:600;color:var(--text);line-height:1;}
+  .kpi-sub{font-size:11px;color:var(--muted);margin-top:6px;}
+  .kpi-card.accent .kpi-value{color:var(--accent);}
+  .kpi-card.success .kpi-value{color:var(--success);}
+  .kpi-card.blue .kpi-value{color:var(--accent2);}
+  .kpi-card.warning .kpi-value{color:var(--warning);}
+
+  /* SECTION */
+  .section{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px;margin-bottom:22px;}
+  .section-title{font-family:"DM Serif Display",serif;font-size:16px;color:var(--text);margin-bottom:18px;display:flex;align-items:center;gap:8px;}
+  .section-title span{font-family:"DM Sans",sans-serif;font-size:11px;color:var(--muted);font-weight:400;letter-spacing:.04em;text-transform:uppercase;}
+
+  /* PRICES */
+  .price-grid{display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:end;}
+  .field-group{display:flex;flex-direction:column;gap:6px;}
+  .field-label{font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;}
+  .price-input{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:"DM Sans",sans-serif;font-size:14px;width:100%;outline:none;transition:border-color .2s;}
+  .price-input:focus{border-color:var(--accent);}
+  .save-btn{background:var(--accent);color:#0d0e11;border:none;border-radius:8px;padding:10px 20px;font-family:"DM Sans",sans-serif;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .2s;}
+  .save-btn:hover{background:#f0d484;}
+  .save-msg{font-size:12px;color:var(--success);margin-top:8px;min-height:18px;}
+
+  /* CHART */
+  .chart-container{position:relative;height:260px;}
+
+  /* TABLE */
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{color:var(--muted);font-size:11px;letter-spacing:.05em;text-transform:uppercase;padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);font-weight:500;}
+  td{padding:10px 12px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  tr:hover td{background:rgba(255,255,255,.02);}
+  .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;background:rgba(232,200,114,.12);color:var(--accent);border:1px solid rgba(232,200,114,.2);}
+  .empty{text-align:center;padding:32px;color:var(--muted);font-size:13px;}
+
+  .refresh-btn{margin-left:auto;padding:5px 12px;border-radius:7px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-family:"DM Sans",sans-serif;font-size:11px;cursor:pointer;transition:all .2s;}
+  .refresh-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+  .tab-row{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:18px;}
+  .tab{padding:8px 18px;font-size:12px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;}
+  .tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:500;}
+
+  ::-webkit-scrollbar{width:5px;}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-mark"><img src="/logo.png" onerror="this.style.display='none'" alt=""/></div>
+  <div>
+    <div class="header-title">Painel de Administração</div>
+    <div class="header-sub">Colink · Diagnóstico de Processos</div>
+  </div>
+  <a href="/" class="back-btn">← Voltar ao chatbot</a>
+</header>
+
+<main>
+
+  <!-- KPIs -->
+  <div class="kpi-grid" id="kpiGrid">
+    <div class="kpi-card accent"><div class="kpi-label">Total de Sessões</div><div class="kpi-value" id="kpiSessions">—</div><div class="kpi-sub">conversas criadas</div></div>
+    <div class="kpi-card blue"><div class="kpi-label">Tokens de Input</div><div class="kpi-value" id="kpiInput">—</div><div class="kpi-sub">tokens enviados</div></div>
+    <div class="kpi-card warning"><div class="kpi-label">Tokens de Output</div><div class="kpi-value" id="kpiOutput">—</div><div class="kpi-sub">tokens gerados</div></div>
+    <div class="kpi-card success"><div class="kpi-label">Custo Total</div><div class="kpi-value" id="kpiCost">—</div><div class="kpi-sub">USD acumulado</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total de Chamadas</div><div class="kpi-value" id="kpiCalls">—</div><div class="kpi-sub">requisições à OpenAI</div></div>
+  </div>
+
+  <!-- PREÇOS -->
+  <div class="section">
+    <div class="section-title">Preços por Token <span>USD por 1 milhão de tokens · GPT-4o Mini</span></div>
+    <div class="price-grid">
+      <div class="field-group">
+        <div class="field-label">Input (prompt)</div>
+        <input type="number" class="price-input" id="priceInput" step="0.001" placeholder="0.150">
+      </div>
+      <div class="field-group">
+        <div class="field-label">Output (resposta)</div>
+        <input type="number" class="price-input" id="priceOutput" step="0.001" placeholder="0.600">
+      </div>
+      <button class="save-btn" onclick="savePrices()">Salvar preços</button>
+    </div>
+    <div class="save-msg" id="saveMsg"></div>
+  </div>
+
+  <!-- GRÁFICO -->
+  <div class="section">
+    <div class="section-title" style="justify-content:space-between;">
+      <span style="font-family:'DM Serif Display',serif;font-size:16px;">Uso da LLM por Dia</span>
+      <div style="display:flex;gap:8px;">
+        <div class="tab active" onclick="switchChart('tokens',this)">Tokens</div>
+        <div class="tab" onclick="switchChart('cost',this)">Custo (USD)</div>
+        <div class="tab" onclick="switchChart('calls',this)">Chamadas</div>
+        <button class="refresh-btn" onclick="loadAnalytics()">↺ Atualizar</button>
+      </div>
+    </div>
+    <div class="chart-container">
+      <canvas id="usageChart"></canvas>
+    </div>
+  </div>
+
+  <!-- SESSÕES -->
+  <div class="section">
+    <div class="section-title">Sessões por Consumo <span>top 10 por tokens</span></div>
+    <table id="sessionTable">
+      <thead>
+        <tr>
+          <th>Cliente</th>
+          <th>Código</th>
+          <th>Mensagens</th>
+          <th>Tokens Input</th>
+          <th>Tokens Output</th>
+          <th>Custo Est.</th>
+          <th>Última atividade</th>
+        </tr>
+      </thead>
+      <tbody id="sessionBody">
+        <tr><td colspan="7" class="empty">Carregando...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</main>
+
+<script>
+let chartInstance = null;
+let chartData = [];
+let currentChartType = 'tokens';
+let prices = { input: 0.150, output: 0.600 };
+
+function fmtNum(n) {
+  if (n >= 1_000_000) return (n/1_000_000).toFixed(2) + 'M';
+  if (n >= 1_000) return (n/1_000).toFixed(1) + 'K';
+  return String(n || 0);
+}
+
+function fmtDate(ts) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleDateString('pt-BR') + ' ' + new Date(ts).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
+}
+
+async function loadAnalytics() {
+  try {
+    const r = await fetch('/api/analytics');
+    const data = await r.json();
+
+    prices = data.prices || prices;
+    document.getElementById('priceInput').value = prices.input;
+    document.getElementById('priceOutput').value = prices.output;
+
+    // KPIs
+    const t = data.totals || {};
+    const sessionCount = (await fetch('/api/sessions').then(r=>r.json())).sessions?.length || 0;
+    document.getElementById('kpiSessions').textContent = sessionCount;
+    document.getElementById('kpiInput').textContent = fmtNum(t.totalInput);
+    document.getElementById('kpiOutput').textContent = fmtNum(t.totalOutput);
+    document.getElementById('kpiCost').textContent = '$' + (t.totalCost || 0).toFixed(4);
+    document.getElementById('kpiCalls').textContent = fmtNum(t.totalCalls);
+
+    // Chart
+    chartData = data.byDay || [];
+    renderChart(currentChartType);
+
+    // Table
+    const tbody = document.getElementById('sessionBody');
+    if (!data.bySession || data.bySession.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty">Nenhuma sessão com uso registrado ainda.</td></tr>';
+    } else {
+      tbody.innerHTML = data.bySession.map(s => {
+        const cost = ((s.tokensInput / 1_000_000) * prices.input + (s.tokensOutput / 1_000_000) * prices.output).toFixed(4);
+        return `<tr>
+          <td><strong>${s.clientName}</strong></td>
+          <td><span class="badge">${s.code}</span></td>
+          <td>${s.messageCount || 0}</td>
+          <td>${fmtNum(s.tokensInput)}</td>
+          <td>${fmtNum(s.tokensOutput)}</td>
+          <td>$${cost}</td>
+          <td>${fmtDate(s.updatedAt)}</td>
+        </tr>`;
+      }).join('');
+    }
+
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+function renderChart(type) {
+  const ctx = document.getElementById('usageChart').getContext('2d');
+  if (chartInstance) chartInstance.destroy();
+
+  const labels = chartData.map(d => d._id);
+  let dataset, label, color;
+
+  if (type === 'tokens') {
+    dataset = [
+      {
+        label: 'Input',
+        data: chartData.map(d => d.tokensInput),
+        backgroundColor: 'rgba(110,154,255,0.7)',
+        borderColor: 'rgba(110,154,255,1)',
+        borderWidth: 1
+      },
+      {
+        label: 'Output',
+        data: chartData.map(d => d.tokensOutput),
+        backgroundColor: 'rgba(232,200,114,0.7)',
+        borderColor: 'rgba(232,200,114,1)',
+        borderWidth: 1
+      }
+    ];
+  } else if (type === 'cost') {
+    dataset = [{
+      label: 'Custo USD',
+      data: chartData.map(d => parseFloat(d.cost.toFixed(6))),
+      backgroundColor: 'rgba(95,203,142,0.7)',
+      borderColor: 'rgba(95,203,142,1)',
+      borderWidth: 1
+    }];
+  } else {
+    dataset = [{
+      label: 'Chamadas',
+      data: chartData.map(d => d.calls),
+      backgroundColor: 'rgba(245,158,11,0.7)',
+      borderColor: 'rgba(245,158,11,1)',
+      borderWidth: 1
+    }];
+  }
+
+  chartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: dataset },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#7a7f8e', font: { family: 'DM Sans', size: 12 } } }
+      },
+      scales: {
+        x: { ticks: { color: '#7a7f8e' }, grid: { color: '#252830' } },
+        y: { ticks: { color: '#7a7f8e' }, grid: { color: '#252830' }, beginAtZero: true }
+      }
+    }
+  });
+}
+
+function switchChart(type, el) {
+  currentChartType = type;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderChart(type);
+}
+
+async function savePrices() {
+  const input = parseFloat(document.getElementById('priceInput').value);
+  const output = parseFloat(document.getElementById('priceOutput').value);
+  const msg = document.getElementById('saveMsg');
+
+  if (isNaN(input) || isNaN(output)) { msg.style.color='var(--danger)'; msg.textContent = 'Valores inválidos.'; return; }
+
+  try {
+    await fetch('/api/prices', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ input, output })
+    });
+    prices = { input, output };
+    msg.style.color = 'var(--success)';
+    msg.textContent = 'Preços salvos com sucesso!';
+    setTimeout(() => msg.textContent = '', 3000);
+    loadAnalytics();
+  } catch(e) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = 'Erro ao salvar.';
+  }
+}
+
+loadAnalytics();
+setInterval(loadAnalytics, 60000); // atualiza a cada 1 minuto
+</script>
+</body>
+</html>
