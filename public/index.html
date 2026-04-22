@@ -1,0 +1,1359 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Colink — Diagnóstico de Processos</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg:#0d0e11; --surface:#14161b; --surface2:#1c1f27;
+    --border:#252830; --accent:#e8c872; --accent2:#6e9aff;
+    --text:#e8e9ec; --muted:#7a7f8e; --danger:#ff6b6b;
+    --success:#5fcb8e; --user-bubble:#1e2535; --ai-bubble:#191b22;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:"DM Sans",sans-serif;font-size:14px;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+
+  /* ── HEADER ── */
+  header{display:flex;align-items:center;gap:14px;padding:14px 24px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;}
+  .logo-mark{width:34px;height:34px;background:white;border-radius:8px;padding:3px;overflow:hidden;flex-shrink:0;}
+  .logo-mark img{width:100%;height:100%;object-fit:contain;display:block;}
+  .header-text h1{font-family:"DM Serif Display",serif;font-size:16px;line-height:1.2;}
+  .header-text p{font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;}
+  .status-dot{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--success);animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  /* ── SESSION BAR ── */
+  .session-bar{display:flex;align-items:center;gap:10px;padding:8px 24px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;}
+  .session-info{display:flex;align-items:center;gap:8px;flex:1;min-width:0;}
+  .session-badge{background:rgba(232,200,114,.12);border:1px solid rgba(232,200,114,.25);color:var(--accent);font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap;}
+  .session-name{font-size:13px;color:var(--text);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .btn-sm{padding:5px 12px;border-radius:8px;font-family:"DM Sans",sans-serif;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text);transition:all .2s;white-space:nowrap;}
+  .btn-sm:hover{border-color:var(--accent);color:var(--accent);}
+  .btn-sm.danger:hover{border-color:var(--danger);color:var(--danger);}
+
+  /* ── STEPS ── */
+  .steps-bar{display:flex;padding:0 24px;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;flex-shrink:0;scrollbar-width:none;}
+  .steps-bar::-webkit-scrollbar{display:none;}
+  .step-chip{padding:7px 14px;font-size:11px;color:var(--muted);white-space:nowrap;border-bottom:2px solid transparent;transition:all .2s;letter-spacing:.04em;}
+  .step-chip.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:500;}
+  .step-chip.done{color:var(--success);border-bottom-color:var(--success);}
+
+  /* ── CHAT ── */
+  #chat{flex:1;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:18px;scroll-behavior:smooth;}
+  #chat::-webkit-scrollbar{width:4px;}
+  #chat::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+
+  .msg{display:flex;flex-direction:column;max-width:82%;animation:fadeIn .3s ease;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  .msg.user{align-self:flex-end;align-items:flex-end;}
+  .msg.ai{align-self:flex-start;align-items:flex-start;}
+  .msg-label{font-size:10px;color:var(--muted);margin-bottom:4px;letter-spacing:.06em;text-transform:uppercase;font-weight:500;}
+  .msg.ai .msg-label{color:var(--accent);}
+  .bubble{padding:12px 16px;border-radius:14px;line-height:1.65;font-size:13.5px;}
+  .msg.user .bubble{background:var(--user-bubble);border-bottom-right-radius:4px;border:1px solid #2a2f3d;}
+  .msg.ai .bubble{background:var(--ai-bubble);border-bottom-left-radius:4px;border:1px solid var(--border);}
+  .bubble p{margin-bottom:8px;}.bubble p:last-child{margin-bottom:0;}
+  .bubble strong{color:var(--accent);font-weight:600;}
+  .bubble table{border-collapse:collapse;width:100%;margin:8px 0;font-size:12.5px;}
+  .bubble th{background:var(--surface2);color:var(--muted);padding:6px 10px;text-align:left;font-size:11px;text-transform:uppercase;}
+  .bubble td{padding:6px 10px;border-top:1px solid var(--border);}
+  .bubble ul,.bubble ol{padding-left:18px;margin:6px 0;}
+  .bubble li{margin-bottom:4px;line-height:1.5;}
+  .bubble img.chat-img{max-width:240px;border-radius:8px;margin-top:6px;display:block;}
+
+  .thinking{display:flex;align-items:center;gap:8px;padding:12px 16px;background:var(--ai-bubble);border:1px solid var(--border);border-radius:14px;border-bottom-left-radius:4px;font-size:12px;color:var(--muted);}
+  .dots{display:flex;gap:4px;}
+  .dots span{width:5px;height:5px;border-radius:50%;background:var(--accent);animation:bounce 1.2s infinite;}
+  .dots span:nth-child(2){animation-delay:.2s}.dots span:nth-child(3){animation-delay:.4s}
+  @keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-5px);opacity:1}}
+
+  /* ── ATTACHMENT ── */
+  #pendingAttachment{display:none;margin-bottom:8px;}
+  .attachment-preview{display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 12px;}
+  .att-icon{font-size:18px;flex-shrink:0;}
+  .att-info{flex:1;min-width:0;}
+  .att-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .att-meta{font-size:11px;color:var(--muted);margin-top:2px;}
+  .att-remove{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0 4px;flex-shrink:0;}
+  .att-remove:hover{color:var(--danger);}
+
+  /* ── INPUT ── */
+  .input-area{padding:10px 24px 16px;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;}
+  .input-row{display:flex;gap:10px;align-items:flex-end;}
+  #attachBtn{width:44px;height:44px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--muted);transition:all .2s;flex-shrink:0;}
+  #attachBtn:hover{border-color:var(--accent);color:var(--accent);}
+  #inputBox{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:"DM Sans",sans-serif;font-size:13.5px;resize:none;min-height:44px;max-height:130px;outline:none;transition:border-color .2s;line-height:1.5;overflow-y:auto;}
+  #inputBox:focus{border-color:var(--accent);}
+  #inputBox::placeholder{color:var(--muted);}
+  #sendBtn{width:44px;height:44px;border-radius:10px;background:var(--accent);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0;}
+  #sendBtn:hover{background:#f0d484;transform:scale(1.04);}
+  #sendBtn:disabled{opacity:.4;cursor:default;transform:none;}
+  #sendBtn svg{width:18px;height:18px;fill:#0d0e11;}
+  .input-hint{font-size:10px;color:var(--muted);margin-top:6px;}
+
+  .error-bubble{background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.2);color:var(--danger);font-size:12.5px;padding:10px 14px;border-radius:10px;margin-top:6px;}
+
+  /* ── MODAL OVERLAY ── */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:999;backdrop-filter:blur(6px);}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px;width:520px;max-width:92vw;max-height:85vh;display:flex;flex-direction:column;}
+  .modal-title{font-family:"DM Serif Display",serif;font-size:20px;color:var(--accent);margin-bottom:6px;}
+  .modal-sub{font-size:12px;color:var(--muted);margin-bottom:20px;}
+
+  .input-field{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--text);font-family:"DM Sans",sans-serif;font-size:13px;outline:none;transition:border-color .2s;margin-bottom:4px;}
+  .input-field:focus{border-color:var(--accent);}
+  .input-field::placeholder{color:var(--muted);}
+  .field-label{font-size:11px;color:var(--muted);margin-bottom:6px;letter-spacing:.04em;text-transform:uppercase;}
+
+  .btn-primary{background:var(--accent);color:#0d0e11;border:none;border-radius:10px;padding:11px 20px;font-family:"DM Sans",sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;width:100%;margin-top:8px;}
+  .btn-primary:hover{background:#f0d484;}
+  .btn-primary:disabled{opacity:.5;cursor:default;}
+
+  .divider{display:flex;align-items:center;gap:10px;margin:18px 0;}
+  .divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--border);}
+  .divider span{font-size:11px;color:var(--muted);}
+
+  /* Session list */
+  .session-list{overflow-y:auto;max-height:320px;display:flex;flex-direction:column;gap:8px;padding-right:4px;}
+  .session-list::-webkit-scrollbar{width:4px;}
+  .session-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+  .session-item{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:all .2s;}
+  .session-item:hover{border-color:var(--accent);}
+  .session-item-info{flex:1;min-width:0;}
+  .session-item-name{font-size:13px;font-weight:600;color:var(--text);}
+  .session-item-meta{font-size:11px;color:var(--muted);margin-top:2px;}
+  .session-item-code{font-size:11px;color:var(--accent);font-weight:600;white-space:nowrap;}
+  .empty-state{text-align:center;padding:24px;color:var(--muted);font-size:13px;}
+
+  ::-webkit-scrollbar{width:5px;}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-mark"><img src="data:image/png;base64,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" alt="Colink"/></div>
+  <div class="header-text">
+    <h1>Colink — Diagnóstico de Processos</h1>
+    <p>Diagnóstico operacional com IA · 10 Steps Colink</p>
+  </div>
+  <div class="status-dot"><div class="dot"></div>Ativo</div>
+  <a href="/admin.html" target="_blank" style="margin-left:12px;padding:5px 12px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;text-decoration:none;transition:all .2s;white-space:nowrap;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">📊 Admin</a>
+  <button onclick="showReportsModal()" style="margin-left:8px;padding:5px 12px;border-radius:8px;background:rgba(232,200,114,.12);border:1px solid rgba(232,200,114,.3);color:var(--accent);font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;transition:all .2s;white-space:nowrap;font-weight:500;" onmouseover="this.style.background='rgba(232,200,114,.2)'" onmouseout="this.style.background='rgba(232,200,114,.12)'">📄 Relatórios</button>
+</header>
+
+<div class="session-bar" id="sessionBar" style="display:none;">
+  <div class="session-info">
+    <span class="session-badge" id="sessionCode">—</span>
+    <span class="session-name" id="sessionName">—</span>
+  </div>
+  <button class="btn-sm" onclick="showSessionModal()">📋 Sessões</button>
+  <button class="btn-sm danger" onclick="confirmNewSession()">＋ Nova</button>
+</div>
+
+<div class="steps-bar" id="stepsBar">
+  <div class="step-chip active" id="s1">1 · Inventário</div>
+  <div class="step-chip" id="s2">2 · Entrevista</div>
+  <div class="step-chip" id="s3">3 · Análise</div>
+  <div class="step-chip" id="s4">4 · AS-IS / TO-BE</div>
+  <div class="step-chip" id="s5">5 · Roadmap</div>
+</div>
+
+<div id="chat"></div>
+
+<div class="input-area">
+  <div id="pendingAttachment"></div>
+  <div class="input-row">
+    <button id="attachBtn" title="Anexar arquivo" onclick="document.getElementById('fileInput').click()">📎</button>
+    <input type="file" id="fileInput" multiple style="display:none"
+      accept=".jpg,.jpeg,.png,.gif,.webp,.xlsx,.xls,.csv,.pdf,.docx,.doc,.txt"
+      onchange="handleFileSelect(this)">
+    <textarea id="inputBox" placeholder="Responda ou envie um arquivo..." rows="1"></textarea>
+    <button id="sendBtn" onclick="send()">
+      <svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+    </button>
+  </div>
+  <div class="input-hint">Enter para enviar · Shift+Enter para nova linha · 📎 para anexar</div>
+</div>
+
+<!-- SESSION MODAL -->
+<div class="modal-overlay" id="sessionModal">
+  <div class="modal">
+    <div class="modal-title">Sessões de Diagnóstico</div>
+    <div class="modal-sub">Digite o nome do cliente para iniciar um diagnóstico, ou retome uma sessão existente abaixo.</div>
+
+    <!-- Nova sessão -->
+    <div class="field-label">Nome do cliente / empresa</div>
+    <input type="text" id="clientName" class="input-field" placeholder="Ex: TechVendas Ltda, Supermercado ABC..." maxlength="60">
+    <div id="newSessionError" style="color:var(--danger);font-size:12px;min-height:18px;margin-bottom:4px;"></div>
+    <button class="btn-primary" onclick="createSession()">Criar sessão</button>
+
+    <div class="divider"><span>ou retome uma sessão existente</span></div>
+
+    <!-- Lista de sessões -->
+    <div class="session-list" id="sessionList">
+      <div class="empty-state">Carregando sessões...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SYSTEM_PROMPT = `Você é o consultor de IA da Colink Business Consulting, especializado em auditoria e mapeamento de processos empresariais.
+
+## OS 10 STEPS PARA MELHORIA E AUTOMAÇÃO
+
+| Step | Pergunta | SIM | NÃO |
+|---|---|---|---|
+| 1 | O processo está mapeado como realmente ocorre? | → Step 2 | → Mapear o processo real |
+| 2 | O processo é estável? | → Step 3 | → Estabilizar o processo |
+| 3 | Os dados são íntegros e consistentes? | → Step 4 | → Elevar maturidade dos dados |
+| 4 | O gargalo está identificado? | → Step 5 | → Identificar o gargalo |
+| 5 | Existe padrão operacional definido? | → Step 6 | → Padronizar o processo |
+| 6 | Há oportunidades reais de melhoria? | → Melhorar | → Step 7 |
+| 7 | O processo é repetitivo e com baixa ambiguidade? | → Step 8 | → Reduzir ambiguidade |
+| 8 | Automação por regras ou por agentes de IA? | RPA/Workflow | → Step 9 |
+| 9 | Os limites de autonomia dos agentes estão definidos? | → Step 10 | → Definir autonomia |
+| 10 | A governança pós-automação está preparada? | → Implementar | → Estabelecer governança |
+
+## REGRAS ABSOLUTAS DE COMPORTAMENTO
+
+**REGRA #1 — UMA PERGUNTA POR VEZ (INVIOLÁVEL):**
+- Envie APENAS UMA pergunta por mensagem. NUNCA duas.
+- Não encadeie perguntas. Não diga "agora vamos para o Step X" E faça a pergunta na mesma mensagem.
+- Se precisar comentar sobre o Step anterior E fazer a próxima pergunta: faça em mensagens SEPARADAS. Mas na prática, apenas comente brevemente E faça a pergunta, tudo em UMA mensagem curta.
+- ERRADO: "Entendi. Step 7: reduzir ambiguidade. Recomendo criar um POP. Agora vamos para o Step 8: automação por regras ou agentes de IA? A resposta é: RPA/Workflow ou Agentes?"
+- CERTO: "Entendido. Para o Step 8: o processo é mais adequado para automação por **RPA/Workflow** (regras fixas) ou **Agentes de IA** (texto livre, variações)?"
+
+**REGRA #2 — CONDUZIR OS 10 STEPS EM SEQUÊNCIA:**
+- Faça as perguntas dos Steps 1 a 10 em ordem, uma por vez.
+- Para cada Step: faça a pergunta diagnóstica, espere a resposta, registre o resultado (SIM/NÃO), avance para o próximo.
+- Não pule Steps. Não volte atrás.
+
+**REGRA #3 — DIAGNÓSTICO COMPLETO AO FINAL:**
+Quando todos os 10 Steps forem respondidos, você DEVE obrigatoriamente gerar o diagnóstico completo em UMA única mensagem com TODAS as seções abaixo:
+
+## DIAGNÓSTICO COMPLETO — [NOME DA EMPRESA]
+
+### Nível de Maturidade Atual
+[Nível 0-5 com justificativa]
+
+### Resultado dos 10 Steps
+| Step | Pergunta | Resultado | Ação |
+[tabela completa]
+
+### AS-IS — Situação Atual
+[Lista das etapas do processo atual com problemas identificados]
+
+### Gargalos Identificados
+[Lista dos gargalos principais]
+
+### TO-BE — Situação Futura com IA
+[Processo redesenhado com automações]
+
+### Oportunidades de IA
+| Oportunidade | Tipo (RPA/Agente) | Impacto | Esforço | Quick Win? |
+[tabela]
+
+### Roadmap
+**0-3 meses (Estruturar):** [ações]
+**3-6 meses (Digitalizar):** [ações]
+**6-12 meses (Automatizar com IA):** [ações]
+
+### Impacto Financeiro Estimado
+[ROI, receita incremental, métricas]
+
+### Próximos Passos Imediatos
+[5 ações concretas]
+
+---
+⚡ *Diagnóstico gerado pela Colink IA. Clique em **📄 Relatórios** no topo para baixar PDF, PPTX, Excel e outros formatos.*
+
+**REGRA #4 — USAR ARQUIVOS ENVIADOS:**
+- Se o usuário enviar arquivos (Excel, Word, PDF, imagens), leia o conteúdo e use para enriquecer o diagnóstico.
+- Ao receber arquivos: confirme quais recebeu, extraia as informações relevantes, e use-as nas respostas seguintes.
+- Nunca ignore arquivos enviados.
+
+## FRAMEWORK DE IA (COLINK)
+
+**Decisão: RPA vs. Agentes de IA**
+- RPA/Workflow: regras fixas, entradas padronizadas, 1 resposta correta
+- Agentes IA: variações, texto livre, "80% correto" já gera valor, alto volume
+
+**Níveis de maturidade:**
+- NÍVEL 0 CAÓTICO → Mapear o processo
+- NÍVEL 1 DEFINIDO → Padronizar + POP
+- NÍVEL 2 PADRONIZADO → Identificar melhorias
+- NÍVEL 3 DIGITALIZADO → Automação por regras
+- NÍVEL 4 AUTOMATIZADO → Agentes de IA
+- NÍVEL 5 INTELIGENTE → Otimizar e expandir
+
+## FLUXO DE INÍCIO
+
+1. Cumprimente brevemente. Pergunte APENAS: qual empresa e setor?
+2. Após resposta → pergunte APENAS: qual processo quer diagnosticar?
+3. Após resposta → pergunte APENAS: tem arquivos ou documentação para compartilhar?
+4. Após resposta → inicie os 10 Steps, um por vez.
+5. Após Step 10 → gere o DIAGNÓSTICO COMPLETO imediatamente.
+
+## TOM E ESTILO
+- Objetivo, consultivo e direto
+- Português do Brasil
+- Use tabelas para estruturar diagnósticos
+- Não invente dados — pergunte quando não tiver informação
+- Quando identificar oportunidade de IA: seja específico (RPA vs. Agente) e cite o benefício concreto`;
+
+let currentSessionId = null;
+let currentStep = 1;
+let isLoading = false;
+let pendingFiles = []; // multiple files support
+
+const chat = document.getElementById("chat");
+const inputBox = document.getElementById("inputBox");
+const sendBtn = document.getElementById("sendBtn");
+
+// ── STEPS ────────────────────────────────────────────────────────────────────
+function updateSteps(step) {
+  currentStep = step;
+  for (let i = 1; i <= 5; i++) {
+    const el = document.getElementById("s" + i);
+    el.className = "step-chip";
+    if (i < step) el.classList.add("done");
+    else if (i === step) el.classList.add("active");
+  }
+}
+
+// ── MESSAGES ─────────────────────────────────────────────────────────────────
+function addMessage(role, content, imgSrc, save = true) {
+  const msg = document.createElement("div");
+  msg.className = `msg ${role}`;
+  const label = document.createElement("div");
+  label.className = "msg-label";
+  label.textContent = role === "user" ? "Você" : "Colink IA";
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+
+  if (imgSrc) {
+    const img = document.createElement("img");
+    img.src = imgSrc; img.className = "chat-img";
+    bubble.appendChild(img);
+    if (content) {
+      const p = document.createElement("p");
+      p.style.marginTop = "6px";
+      p.innerHTML = formatMarkdown(content);
+      bubble.appendChild(p);
+    }
+  } else {
+    bubble.innerHTML = formatMarkdown(content);
+  }
+
+  msg.appendChild(label); msg.appendChild(bubble);
+  chat.appendChild(msg);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+// ── MARKDOWN ──────────────────────────────────────────────────────────────────
+function formatMarkdown(text) {
+  text = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+  text = text.replace(/\*(.*?)\*/g, "<em>$1</em>");
+  text = text.replace(/^### (.+)$/gm, "<p style=\"font-size:12px;font-weight:600;color:var(--accent);margin-top:12px;margin-bottom:4px;letter-spacing:.04em;text-transform:uppercase;\">$1</p>");
+  text = text.replace(/^## (.+)$/gm, "<p style=\"font-family:\'DM Serif Display\',serif;font-size:15px;margin-top:12px;margin-bottom:6px;\">$1</p>");
+  text = text.replace(/^# (.+)$/gm, "<p style=\"font-family:\'DM Serif Display\',serif;font-size:17px;color:var(--accent);margin-bottom:8px;\">$1</p>");
+  text = parseTable(text);
+  text = text.replace(/^[-•] (.+)$/gm, "<li>$1</li>");
+  text = text.replace(/^\d+\. (.+)$/gm, "<li>$1</li>");
+  text = text.replace(/`([^`]+)`/g, "<code style=\"background:rgba(255,255,255,.07);padding:2px 6px;border-radius:4px;font-family:monospace;font-size:12px;\">$1</code>");
+  text = text.replace(/^---$/gm, "<hr style=\"border:none;border-top:1px solid var(--border);margin:10px 0;\">");
+  text = text.split("\n\n").map(p => {
+    if (p.trim() && !p.includes("<table") && !p.includes("<ul") && !p.includes("<p ") && !p.includes("<hr")) {
+      return `<p>${p.replace(/\n/g, "<br>")}</p>`;
+    }
+    return p;
+  }).join("\n");
+  return text;
+}
+
+function parseTable(text) {
+  const lines = text.split("\n");
+  let result = [], inTable = false, tableHtml = "";
+  for (const line of lines) {
+    if (line.trim().startsWith("|")) {
+      if (!inTable) {
+        inTable = true;
+        tableHtml = "<table><thead><tr>";
+        line.split("|").filter(c => c.trim()).forEach(h => { tableHtml += `<th>${h.trim()}</th>`; });
+        tableHtml += "</tr></thead><tbody>";
+      } else if (line.includes("---")) { continue; }
+      else {
+        tableHtml += "<tr>";
+        line.split("|").slice(1, -1).forEach(c => { tableHtml += `<td>${c.trim()}</td>`; });
+        tableHtml += "</tr>";
+      }
+    } else {
+      if (inTable) { tableHtml += "</tbody></table>"; result.push(tableHtml); inTable = false; tableHtml = ""; }
+      result.push(line);
+    }
+  }
+  if (inTable) { tableHtml += "</tbody></table>"; result.push(tableHtml); }
+  return result.join("\n");
+}
+
+// ── THINKING ──────────────────────────────────────────────────────────────────
+function showThinking() {
+  const msg = document.createElement("div");
+  msg.className = "msg ai"; msg.id = "thinking";
+  const label = document.createElement("div");
+  label.className = "msg-label"; label.textContent = "Colink IA";
+  const t = document.createElement("div");
+  t.className = "thinking";
+  t.innerHTML = "<div class=\"dots\"><span></span><span></span><span></span></div>Analisando...";
+  msg.appendChild(label); msg.appendChild(t);
+  chat.appendChild(msg); chat.scrollTop = chat.scrollHeight;
+}
+function removeThinking() { const t = document.getElementById("thinking"); if (t) t.remove(); }
+
+// ── SESSION MODAL ─────────────────────────────────────────────────────────────
+function showSessionModal() {
+  document.getElementById("sessionModal").style.display = "flex";
+  document.getElementById("clientName").value = "";
+  document.getElementById("newSessionError").textContent = "";
+  loadSessionList();
+}
+
+function hideSessionModal() {
+  document.getElementById("sessionModal").style.display = "none";
+}
+
+async function loadSessionList() {
+  const list = document.getElementById("sessionList");
+  list.innerHTML = '<div class="empty-state" style="display:flex;flex-direction:column;align-items:center;gap:8px;"><span style="font-size:18px;">⏳</span><span>Carregando sessões...</span></div>';
+  
+  // Timeout controller - Railway can be slow on cold start
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  
+  try {
+    const r = await fetch("/api/sessions", { signal: controller.signal });
+    clearTimeout(timeout);
+    const data = await r.json();
+
+    // DB still connecting — auto retry after 3s
+    if (data.retry) {
+      list.innerHTML = '<div class="empty-state" style="text-align:center;"><span style="font-size:16px;">🔄</span><br><span style="color:var(--muted);font-size:12px;">Conectando ao banco de dados...<br>aguarde um momento</span></div>';
+      setTimeout(() => loadSessionList(), 3000);
+      return;
+    }
+    
+    if (!data.sessions || data.sessions.length === 0) {
+      list.innerHTML = '<div class="empty-state" style="text-align:center;color:var(--muted);font-size:12px;">Nenhuma sessão encontrada.<br>Crie a primeira sessão acima.</div>';
+      return;
+    }
+    
+    list.innerHTML = "";
+    data.sessions.sort((a, b) => b.updatedAt - a.updatedAt).forEach(s => {
+      const item = document.createElement("div");
+      item.className = "session-item";
+      const msgs = s.messageCount || 0;
+      item.innerHTML = `
+        <div class="session-item-info">
+          <div class="session-item-name">${s.clientName}</div>
+          <div class="session-item-meta">${s.code} · ${msgs} msg${msgs!==1?'s':''} · ${formatDate(s.updatedAt)}</div>
+        </div>
+        <div class="session-item-code" style="color:var(--accent);font-size:11px;font-weight:600;">Abrir →</div>
+      `;
+      item.onclick = () => loadSession(s.id);
+      list.appendChild(item);
+    });
+  } catch(e) {
+    clearTimeout(timeout);
+    const isTimeout = e.name === 'AbortError';
+    list.innerHTML = `
+      <div class="empty-state" style="text-align:center;">
+        <div style="color:var(--danger);margin-bottom:8px;">${isTimeout ? '⏱ Conexão lenta — servidor iniciando...' : '⚠️ Erro ao carregar sessões.'}</div>
+        <button onclick="loadSessionList()" style="background:var(--surface2);border:1px solid var(--border);color:var(--accent);padding:6px 14px;border-radius:8px;font-size:12px;cursor:pointer;">↺ Tentar novamente</button>
+      </div>`;
+  }
+}
+
+function formatDate(ts) {
+  if (!ts) return "—";
+  const d = new Date(ts);
+  return d.toLocaleDateString("pt-BR") + " " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+
+async function createSession() {
+  const name = document.getElementById("clientName").value.trim();
+  const errEl = document.getElementById("newSessionError");
+  if (!name) { errEl.textContent = "Informe o nome do cliente."; return; }
+  errEl.textContent = "";
+
+  try {
+    const r = await fetch("/api/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientName: name })
+    });
+    const data = await r.json();
+    if (data.error) { errEl.textContent = data.error; return; }
+    await loadSession(data.id, true);
+  } catch(e) {
+    errEl.textContent = "Erro ao criar sessão.";
+  }
+}
+
+async function loadSession(sessionId, isNew = false) {
+  hideSessionModal();
+  currentSessionId = sessionId;
+  chat.innerHTML = "";
+  updateSteps(1);
+
+  try {
+    const r = await fetch(`/api/sessions/${sessionId}`);
+    const data = await r.json();
+
+    // Update session bar
+    document.getElementById("sessionCode").textContent = data.code;
+    document.getElementById("sessionName").textContent = data.clientName;
+    document.getElementById("sessionBar").style.display = "flex";
+
+    if (data.messages && data.messages.length > 0) {
+      // Restore existing conversation
+      data.messages.forEach(m => {
+        addMessage(m.role === "assistant" ? "ai" : "user", m.displayContent || m.content, m.imgSrc, false);
+      });
+
+      // Restore step
+      const lastAI = [...data.messages].reverse().find(m => m.role === "assistant");
+      if (lastAI) {
+        const lr = (lastAI.content || "").toLowerCase();
+        if (lr.includes("roadmap") || lr.includes("próximos passos")) updateSteps(5);
+        else if (lr.includes("as-is") || lr.includes("situação atual")) updateSteps(4);
+        else if (lr.includes("step") || lr.includes("processo é")) updateSteps(3);
+        else if (lr.includes("como o processo") || lr.includes("qual o volume")) updateSteps(2);
+      }
+    } else if (isNew) {
+      // New session — get greeting
+      await getGreeting();
+    }
+  } catch(e) {
+    addMessage("ai", "Erro ao carregar sessão. Tente novamente.", null, false);
+  }
+
+  inputBox.focus();
+}
+
+async function getGreeting() {
+  isLoading = true; sendBtn.disabled = true; showThinking();
+  try {
+    const r = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: currentSessionId,
+        max_tokens: 400,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: "Inicie a sessão de diagnóstico." }
+        ]
+      })
+    });
+    const data = await r.json();
+    removeThinking();
+    if (!data.error) {
+      const reply = data.choices[0].message.content;
+      addMessage("ai", reply, null, false); // already saved by server
+    }
+  } catch(e) {
+    removeThinking();
+    addMessage("ai", "Olá! Sou o consultor de IA da **Colink**. Qual empresa e setor você representa?", null, false);
+  }
+  isLoading = false; sendBtn.disabled = false;
+}
+
+function confirmNewSession() {
+  showSessionModal();
+  document.getElementById("clientName").focus();
+}
+
+// ── FILE HANDLING ─────────────────────────────────────────────────────────────
+const FILE_ICONS = { image:"🖼️", excel:"📊", pdf:"📄", word:"📝", text:"📋", unknown:"📎" };
+
+function getFileCategory(name) {
+  const ext = name.split(".").pop().toLowerCase();
+  if (["jpg","jpeg","png","gif","webp"].includes(ext)) return "image";
+  if (["xlsx","xls","csv"].includes(ext)) return "excel";
+  if (ext === "pdf") return "pdf";
+  if (["docx","doc"].includes(ext)) return "word";
+  if (ext === "txt") return "text";
+  return "unknown";
+}
+
+function formatBytes(b) {
+  if (b < 1024) return b + " B";
+  if (b < 1048576) return (b/1024).toFixed(1) + " KB";
+  return (b/1048576).toFixed(1) + " MB";
+}
+
+async function handleFileSelect(input) {
+  const files = Array.from(input.files);
+  if (!files.length) return;
+  input.value = "";
+
+  for (const file of files) {
+    const category = getFileCategory(file.name);
+    let fileObj;
+    if (category === "image") {
+      const b64 = await readAsBase64(file);
+      fileObj = { type: "image", category, name: file.name, size: file.size, data: b64, mimeType: file.type };
+    } else if (category === "excel") {
+      const text = await readExcelAsText(file);
+      fileObj = { type: "text_file", category, name: file.name, size: file.size, data: text };
+    } else {
+      const b64 = await readAsBase64(file);
+      fileObj = { type: "server_extract", category, name: file.name, size: file.size, data: b64, mimeType: file.type };
+    }
+    pendingFiles.push(fileObj);
+  }
+  showPendingAttachment();
+}
+
+function readAsBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = () => rej(new Error("Erro ao ler arquivo"));
+    r.readAsDataURL(file);
+  });
+}
+
+async function readExcelAsText(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = (e) => {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type:"array", cellFormula:true });
+        let out = `=== EXCEL: ${file.name} ===\nAbas: ${wb.SheetNames.join(", ")}\n\n`;
+        wb.SheetNames.forEach(name => {
+          const ws = wb.Sheets[name];
+          const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
+          out += `--- ABA: ${name} (${range.e.r+1} linhas x ${range.e.c+1} colunas) ---\n`;
+          out += "DADOS:\n" + XLSX.utils.sheet_to_csv(ws, { blankrows:false }) + "\n\n";
+          const formulas = [];
+          Object.keys(ws).forEach(cell => { if (!cell.startsWith("!") && ws[cell].f) formulas.push(`${cell}: =${ws[cell].f}`); });
+          if (formulas.length) out += `FÓRMULAS (${formulas.length}):\n` + formulas.join("\n") + "\n\n";
+        });
+        res(out);
+      } catch(err) { rej(err); }
+    };
+    r.onerror = () => rej(new Error("Erro ao ler Excel"));
+    r.readAsArrayBuffer(file);
+  });
+}
+
+function showPendingAttachment() {
+  const c = document.getElementById("pendingAttachment");
+  if (!pendingFiles.length) { c.style.display = "none"; c.innerHTML = ""; return; }
+  c.style.display = "flex";
+  c.innerHTML = `
+    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;flex:1;">
+      ${pendingFiles.map((f,i) => `
+        <div style="display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:12px;">
+          <span>${FILE_ICONS[f.category] || '📎'}</span>
+          <span style="color:var(--accent);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${f.name}</span>
+          <span style="color:var(--muted);font-size:10px;">${formatBytes(f.size)}</span>
+          <button onclick="removeFile(${i})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0 0 0 4px;line-height:1;">✕</button>
+        </div>
+      `).join('')}
+    </div>
+    <span style="font-size:11px;color:var(--muted);padding-left:6px;">${pendingFiles.length} arquivo${pendingFiles.length>1?'s':''} selecionado${pendingFiles.length>1?'s':''}</span>
+  `;
+}
+
+function removeFile(index) {
+  pendingFiles.splice(index, 1);
+  showPendingAttachment();
+}
+
+function clearPendingAttachment() {
+  pendingFiles = [];
+  const c = document.getElementById("pendingAttachment");
+  c.style.display = "none"; c.innerHTML = "";
+}
+
+function readAsBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = () => rej(new Error("Erro ao ler arquivo"));
+    r.readAsDataURL(file);
+  });
+}
+
+async function readExcelAsText(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = (e) => {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type:"array", cellFormula:true });
+        let out = `=== EXCEL: ${file.name} ===\nAbas: ${wb.SheetNames.join(", ")}\n\n`;
+        wb.SheetNames.forEach(name => {
+          const ws = wb.Sheets[name];
+          const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
+          out += `--- ABA: ${name} (${range.e.r+1} linhas x ${range.e.c+1} colunas) ---\n`;
+          out += "DADOS:\n" + XLSX.utils.sheet_to_csv(ws, { blankrows:false }) + "\n\n";
+          const formulas = [];
+          Object.keys(ws).forEach(cell => { if (!cell.startsWith("!") && ws[cell].f) formulas.push(`${cell}: =${ws[cell].f}`); });
+          if (formulas.length) out += `FÓRMULAS (${formulas.length}):\n` + formulas.join("\n") + "\n\n";
+        });
+        res(out);
+      } catch(err) { rej(err); }
+    };
+    r.onerror = () => rej(new Error("Erro ao ler Excel"));
+    r.readAsArrayBuffer(file);
+  });
+}
+
+
+
+
+// ── SEND ──────────────────────────────────────────────────────────────────────
+
+// ── BUILD FULL CONVERSATION HISTORY ──────────────────────────────────────────
+function buildMessages(newUserContent) {
+  const msgs = [{ role: "system", content: SYSTEM_PROMPT }];
+  // Collect all messages from chat DOM
+  const chatMsgs = document.querySelectorAll('#chat .msg');
+  chatMsgs.forEach(m => {
+    const isUser = m.classList.contains('user');
+    const bubble = m.querySelector('.bubble');
+    if (!bubble) return;
+    const text = bubble.innerText || bubble.textContent || '';
+    if (text.trim()) {
+      msgs.push({ role: isUser ? 'user' : 'assistant', content: text.trim() });
+    }
+  });
+  // Add the new user message (not yet in DOM)
+  msgs.push({ role: 'user', content: newUserContent });
+  // Keep max 40 messages to avoid token limit (system + last 39)
+  if (msgs.length > 41) {
+    const system = msgs[0];
+    const recent = msgs.slice(-(40));
+    return [system, ...recent];
+  }
+  return msgs;
+}
+
+async function send() {
+  const text = inputBox.value.trim();
+  if ((!text && !pendingFiles.length) || isLoading || !currentSessionId) return;
+
+  inputBox.value = ""; inputBox.style.height = "auto";
+  isLoading = true; sendBtn.disabled = true;
+
+  const files = [...pendingFiles];
+  clearPendingAttachment();
+
+  // Show user messages in chat
+  if (files.length > 0) {
+    const fileNames = files.map(f => `📎 *${f.name}*`).join("  ");
+    addMessage("user", (text ? text + "\n\n" : "") + fileNames, null, false);
+  } else {
+    addMessage("user", text, null, false);
+  }
+
+  // Build content for API — process all files
+  let userMsgContent = "";
+  let displayContent = text || "";
+
+  if (files.length > 0) {
+    showThinking();
+    let filesText = text ? text + "\n\n" : "";
+    filesText += `Recebi ${files.length} arquivo${files.length>1?"s":""} para análise:\n\n`;
+
+    for (const file of files) {
+      if (file.type === "image") {
+        // For images, we can only handle 1 at a time with vision — send as text description
+        filesText += `[IMAGEM: ${file.name}] — Arquivo de imagem enviado pelo usuário para análise visual.\n`;
+      } else if (file.type === "text_file") {
+        filesText += file.data + "\n\n";
+      } else if (file.type === "server_extract") {
+        try {
+          const resp = await fetch("/api/extract", {
+            method:"POST", headers:{"Content-Type":"application/json"},
+            body: JSON.stringify({ name:file.name, data:file.data, mimeType:file.mimeType })
+          });
+          const result = await resp.json();
+          filesText += result.text + "\n\n";
+        } catch(e) {
+          filesText += `[Erro ao extrair ${file.name}]\n`;
+        }
+      }
+    }
+    removeThinking();
+
+    // If single image, use vision
+    if (files.length === 1 && files[0].type === "image") {
+      const b64 = files[0].data.split(",")[1];
+      userMsgContent = [
+        { type:"image_url", image_url:{ url:`data:${files[0].mimeType};base64,${b64}`, detail:"high" } },
+        { type:"text", text: text || "Analise esta imagem no contexto do diagnóstico de processos." }
+      ];
+    } else {
+      userMsgContent = filesText;
+    }
+
+    displayContent = (text ? text + " — " : "") + files.map(f=>f.name).join(", ");
+  } else {
+    userMsgContent = text;
+    displayContent = text;
+  }
+
+  showThinking();
+
+  try {
+    const r = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: currentSessionId,
+        max_tokens: 1500,
+        userDisplayContent: displayContent,
+        messages: buildMessages(userMsgContent)
+      })
+    });
+    const data = await r.json();
+    removeThinking();
+
+    if (data.error) {
+      const e = document.createElement("div"); e.className = "error-bubble";
+      e.textContent = "Erro: " + data.error.message; chat.appendChild(e);
+    } else {
+      const reply = data.choices[0].message.content;
+      addMessage("ai", reply, null, false);
+      const lr = reply.toLowerCase();
+      // Update progress bar
+      if (lr.includes("roadmap") || lr.includes("próximos passos") || lr.includes("step 10") || lr.includes("diagnóstico completo")) updateSteps(5);
+      else if (lr.includes("as-is") || lr.includes("situação atual") || lr.includes("step 9") || lr.includes("step 8")) updateSteps(4);
+      else if (lr.includes("step 7") || lr.includes("step 6") || lr.includes("step 5") || lr.includes("gargalo")) updateSteps(3);
+      else if (lr.includes("step 4") || lr.includes("step 3") || lr.includes("step 2") || lr.includes("como o processo")) updateSteps(2);
+      // Detect diagnosis complete — show CTA banner
+      const isDiagnosisComplete = (
+        lr.includes("diagnóstico completo") ||
+        (lr.includes("as-is") && lr.includes("to-be") && lr.includes("roadmap")) ||
+        (lr.includes("próximos passos") && lr.includes("oportunidades") && lr.includes("roadmap")) ||
+        (lr.includes("impacto financeiro") && lr.includes("roadmap"))
+      );
+      if (isDiagnosisComplete) {
+        updateSteps(5);
+        setTimeout(() => {
+          const banner = document.createElement("div");
+          banner.style.cssText = "background:linear-gradient(135deg,rgba(232,200,114,0.15),rgba(26,115,232,0.1));border:1px solid rgba(232,200,114,0.4);border-radius:12px;padding:16px 20px;margin:12px 0;display:flex;align-items:center;justify-content:space-between;gap:12px;";
+          banner.innerHTML = '<div><div style="font-weight:600;color:#e8c872;font-size:13px;margin-bottom:3px;">&#x2705; Diagnóstico concluído!</div><div style="font-size:12px;color:#9aa3b2;">Clique em Relatórios para baixar PDF, PPTX, Excel, Infográfico e mais.</div></div><button onclick="showReportsModal()" style="background:#e8c872;color:#0d0e11;border:none;border-radius:8px;padding:9px 18px;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;">&#x1F4C4; Gerar Relatórios</button>';
+          chat.appendChild(banner);
+          chat.scrollTop = chat.scrollHeight;
+        }, 800);
+      }
+    }
+  } catch(err) {
+    removeThinking();
+    const e = document.createElement("div"); e.className = "error-bubble";
+    e.textContent = "Falha na conexão. Tente novamente."; chat.appendChild(e);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  isLoading = false; sendBtn.disabled = false; inputBox.focus();
+}
+
+// ── INPUT EVENTS ───────────────────────────────────────────────────────────────
+inputBox.addEventListener("input", () => {
+  inputBox.style.height = "auto";
+  inputBox.style.height = Math.min(inputBox.scrollHeight, 130) + "px";
+});
+inputBox.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+});
+
+document.addEventListener("dragover", e => e.preventDefault());
+document.addEventListener("drop", e => {
+  e.preventDefault();
+  const files = e.dataTransfer.files;
+  if (files.length) handleFileSelect({ files, value:"" });
+});
+
+// ── INIT ───────────────────────────────────────────────────────────────────────
+
+// ── REPORTS ───────────────────────────────────────────────────────────────────
+function showReportsModal() {
+  const modal = document.getElementById('reportsModal');
+  const grid  = document.getElementById('reportsGrid');
+  const noSes = document.getElementById('reportsNoSession');
+  const sub   = document.getElementById('reportsSub');
+  if (!currentSessionId) {
+    grid.style.display  = 'none';
+    noSes.style.display = 'block';
+  } else {
+    grid.style.display  = 'grid';
+    noSes.style.display = 'none';
+    const name = document.getElementById('sessionName');
+    const code = document.getElementById('sessionCode');
+    sub.textContent = 'Conversa atual · ' + (name ? name.textContent : '') + ' ' + (code ? code.textContent : '');
+  }
+  modal.style.display = 'flex';
+}
+
+function hideReportsModal() {
+  document.getElementById('reportsModal').style.display = 'none';
+}
+
+function buildConversationSummary() {
+  const msgs = document.querySelectorAll('#chat .msg');
+  let summary = '';
+  msgs.forEach(m => {
+    const role = m.classList.contains('user') ? 'Consultor' : 'IA Colink';
+    const text = (m.querySelector('.bubble') || {}).innerText || '';
+    if (text.trim()) summary += role + ': ' + text.trim() + '\n\n';
+  });
+  return summary.slice(0, 14000);
+}
+
+async function callAIForReport(systemPrompt, userPrompt) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 55000); // 55s timeout
+  try {
+    const r = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        max_tokens: 4000,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user',   content: userPrompt   }
+        ]
+      })
+    });
+    clearTimeout(timeout);
+    const data = await r.json();
+    if (data.error) throw new Error(data.error.message || 'Erro da API');
+    return data.choices[0].message.content;
+  } catch(e) {
+    clearTimeout(timeout);
+    if (e.name === 'AbortError') throw new Error('Timeout — o relatório demorou demais. Tente novamente.');
+    throw e;
+  }
+}
+
+function downloadBlob(content, filename, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function setCardGenerating(id, generating) {
+  const card = document.getElementById('card-' + id);
+  if (!card) return;
+  if (generating) card.classList.add('generating');
+  else            card.classList.remove('generating');
+}
+
+async function generateReport(type) {
+  if (!currentSessionId) return;
+  setCardGenerating(type, true);
+
+  const conversation = buildConversationSummary();
+  const sessionName  = (document.getElementById('sessionName') || {}).textContent || 'Cliente';
+  const sessionCode  = (document.getElementById('sessionCode') || {}).textContent || '';
+  const today        = new Date().toLocaleDateString('pt-BR');
+
+  // Premium system prompt for all reports
+  const REPORT_SYSTEM = `Você é um consultor sênior da Colink Business Consulting.
+Gere relatórios DETALHADOS, COMPLETOS e IMPRESSIONANTES para apresentação executiva ao cliente.
+REGRAS:
+- Use dados reais extraídos da conversa
+- Inclua SEMPRE: métricas quantitativas, benchmarks de mercado, matriz de risco, análise financeira detalhada
+- Seja específico: cite ferramentas, responsáveis, prazos reais
+- Formato profissional em português do Brasil
+- Mínimo de conteúdo: seja EXTENSO e DETALHADO`;
+
+  try {
+
+    // ── PDF / RELATÓRIO EXECUTIVO ──────────────────────────────────────────────
+    if (type === 'pdf') {
+      const md = await callAIForReport(REPORT_SYSTEM,
+        `Com base nesta conversa de diagnóstico, gere um RELATÓRIO EXECUTIVO COMPLETO em HTML estilizado.
+
+DADOS: Empresa: ${sessionName} ${sessionCode} | Data: ${today}
+CONVERSA: ${conversation}
+
+Gere HTML completo com estas seções obrigatórias (use tabelas, listas e formatação rica):
+
+1. RESUMO EXECUTIVO (contexto, escopo, metodologia, principais achados em 4 bullets)
+2. DIAGNÓSTICO 10 STEPS (tabela completa com Step, Pergunta, Status SIM/NÃO, Nível atual, Ação necessária)
+3. NÍVEL DE MATURIDADE (0-5, com justificativa detalhada e o que significa para a empresa)
+4. SITUAÇÃO ATUAL — AS-IS (tabela: Etapa | Responsável | Ferramenta | Problema | Impacto)
+5. GARGALOS CRÍTICOS (tabela: Gargalo | Causa Raiz | Impacto Estimado | Urgência)
+6. SITUAÇÃO FUTURA — TO-BE (tabela: Etapa | Responsável | Ferramenta | Automação | Benefício)
+7. OPORTUNIDADES DE IA (tabela: Oportunidade | Tipo RPA/Agente | Impacto | Esforço | Quick Win | Prazo)
+8. BENCHMARK DE MERCADO (compare com empresas similares: taxa de conversão média do setor, tempo médio de resposta a leads, % adoção de CRM, etc.)
+9. MATRIZ DE RISCO (tabela: Risco | Probabilidade | Impacto | Score | Mitigação)
+10. IMPACTO FINANCEIRO (tabela detalhada: Cenário Atual vs Projetado, ROI, Payback, VPL estimado)
+11. ROADMAP DETALHADO (3 fases com tabela: Iniciativa | Responsável | Prazo | Esforço | Impacto | Dependências)
+12. PRÓXIMOS 5 PASSOS IMEDIATOS (numerados, com owner e prazo específico)
+
+Use este CSS inline no HTML:
+body{font-family:Calibri,sans-serif;max-width:900px;margin:40px auto;padding:0 28px;color:#1a1a2e;line-height:1.7;font-size:14px;}
+.header{background:#0F1B35;color:white;padding:28px 32px;margin:0 -28px 36px;border-left:6px solid #E8C872;}
+.header h1{color:#E8C872;font-size:26px;margin-bottom:6px;border:none;}
+.header p{color:#9AA3B2;font-size:13px;}
+h2{color:#0F1B35;font-size:17px;border-left:4px solid #E8C872;padding-left:12px;margin:32px 0 12px;}
+h3{color:#1A73E8;font-size:14px;margin:20px 0 8px;}
+table{border-collapse:collapse;width:100%;margin:14px 0;font-size:13px;}
+th{background:#0F1B35;color:white;padding:9px 12px;text-align:left;font-size:12px;letter-spacing:.04em;}
+td{padding:9px 12px;border-bottom:1px solid #e8ecf4;}
+tr:nth-child(even) td{background:#f8f9ff;}
+.kpi-row{display:flex;gap:16px;margin:20px 0;}
+.kpi{flex:1;background:#f0f4ff;border-radius:10px;padding:16px;text-align:center;border-top:3px solid #1A73E8;}
+.kpi.gold{border-top-color:#E8C872;background:#fffbeb;}
+.kpi.green{border-top-color:#2E7D52;background:#edfaf1;}
+.kpi.red{border-top-color:#C0392B;background:#fef2f2;}
+.kpi-v{font-size:26px;font-weight:700;color:#0F1B35;display:block;}
+.kpi-l{font-size:11px;color:#7a7f8e;margin-top:4px;}
+.risk-high{background:#fef2f2;color:#c0392b;}
+.risk-med{background:#fffbeb;color:#856404;}
+.risk-low{background:#edfaf1;color:#2E7D52;}
+.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;}
+.badge-rpa{background:#eff6ff;color:#1a73e8;}
+.badge-ia{background:#edfaf1;color:#2e7d52;}
+footer{background:#f4f6fb;padding:14px 28px;font-size:11px;color:#7a7f8e;border-top:2px solid #e2e8f0;margin:32px -28px 0;text-align:center;}`
+      );
+      downloadBlob(md, 'relatorio-' + sessionName + '-' + sessionCode + '.html', 'text/html');
+
+    // ── EXCEL / PLANO DE AÇÃO ─────────────────────────────────────────────────
+    } else if (type === 'excel') {
+      const csv = await callAIForReport(REPORT_SYSTEM,
+        `Com base no diagnóstico, gere um PLANO DE AÇÃO COMPLETO em CSV com ponto-e-vírgula.
+
+EMPRESA: ${sessionName} | DATA: ${today}
+CONVERSA: ${conversation}
+
+Gere CSV com EXATAMENTE estas colunas e pelo menos 15 linhas de iniciativas reais:
+#;Iniciativa;Processo;Tipo;Prazo;Impacto;Esforço;Responsável Sugerido;Status;Observação
+
+Tipos possíveis: Melhoria de Processo / Digitalização / RPA / Agente IA / Integração / Capacitação
+Prazos: 0-3m / 3-6m / 6-12m
+Impacto/Esforço: Alto / Médio / Baixo
+Status: A iniciar
+
+Retorne APENAS o CSV sem explicações, sem markdown, sem blocos de código.`
+      );
+      downloadBlob('\uFEFF' + csv, 'plano-acao-' + sessionName + '.csv', 'text/csv;charset=utf-8');
+
+    // ── ESPECIFICAÇÃO FUNCIONAL ───────────────────────────────────────────────
+    } else if (type === 'spec') {
+      const spec = await callAIForReport(REPORT_SYSTEM,
+        `Com base no diagnóstico, gere uma ESPECIFICAÇÃO FUNCIONAL COMPLETA em HTML.
+
+EMPRESA: ${sessionName} | DATA: ${today}
+CONVERSA: ${conversation}
+
+Seções obrigatórias:
+1. OBJETIVO DO DOCUMENTO
+2. ESCOPO (inclui / não inclui)
+3. ATORES E RESPONSABILIDADES (tabela: Ator | Papel | Responsabilidade | SLA)
+4. FLUXO TO-BE DETALHADO (passo a passo numerado com: Etapa | Trigger | Responsável | Sistema | Output | SLA)
+5. REGRAS DE NEGÓCIO (mínimo 10 regras numeradas RN01..RN10)
+6. ENTRADAS E SAÍDAS (tabela: Tipo | Item | Formato | Origem | Destino)
+7. EXCEÇÕES E TRATAMENTOS (tabela: Situação | Causa | Tratamento | Responsável)
+8. INTEGRAÇÕES COM SISTEMAS (tabela: Sistema | Tipo | Dados | Frequência | Responsável)
+9. REQUISITOS NÃO FUNCIONAIS (performance, disponibilidade, segurança, LGPD)
+10. CRITÉRIOS DE ACEITE (lista de critérios mensuráveis)
+11. GLOSSÁRIO
+
+Use CSS: body{font-family:Calibri,sans-serif;max-width:900px;margin:40px auto;padding:0 28px;color:#1a1a2e;line-height:1.7;}
+h1{color:#0F1B35;font-size:22px;border-bottom:3px solid #1A73E8;padding-bottom:8px;}
+h2{font-size:15px;color:white;background:#0F1B35;padding:8px 14px;border-left:4px solid #1A73E8;margin:24px 0 10px;}
+table{border-collapse:collapse;width:100%;font-size:13px;margin:12px 0;}
+th{background:#0F1B35;color:white;padding:8px 10px;text-align:left;font-size:11px;}
+td{padding:8px 10px;border:1px solid #e2e8f0;}
+tr:nth-child(even) td{background:#f8f9ff;}
+.rule{background:#fffbeb;border-left:3px solid #E8C872;padding:8px 12px;margin:5px 0;border-radius:0 6px 6px 0;}
+footer{font-size:11px;color:#7a7f8e;text-align:center;margin-top:28px;padding-top:12px;border-top:1px solid #e2e8f0;}`
+      );
+      downloadBlob(spec, 'especificacao-' + sessionName + '.html', 'text/html');
+
+    // ── INFOGRÁFICO ───────────────────────────────────────────────────────────
+    } else if (type === 'infographic') {
+      const raw = await callAIForReport(REPORT_SYSTEM,
+        `Extraia os dados do diagnóstico e retorne APENAS JSON válido (sem markdown, sem explicação):
+{"cliente":"nome completo","processo":"nome do processo","nivel":0,"nivel_label":"CAÓTICO",
+"steps_ok":[4,6,7],"steps_nok":[1,2,3,5,9,10],
+"gargalos":["descrição gargalo 1","descrição gargalo 2","descrição gargalo 3"],
+"oportunidades":[{"tipo":"RPA","desc":"descrição específica"},{"tipo":"Agente IA","desc":"descrição específica"},{"tipo":"RPA","desc":"descrição"},{"tipo":"Agente IA","desc":"descrição"}],
+"quick_wins":["ação específica 1","ação específica 2","ação específica 3"],
+"conversao_atual":"8%","conversao_meta":"15%","roi":"R$ 230.400"}
+
+CONVERSA: ${conversation}`
+      );
+      let d;
+      try { d = JSON.parse(raw.replace(/```json|```/g,'').trim()); }
+      catch(e) { d = {cliente:sessionName,processo:'Processo',nivel:0,nivel_label:'CAÓTICO',steps_ok:[4,6,7],steps_nok:[1,2,3,5,9,10],gargalos:['Identificar gargalos','Padronizar processo','Formalizar SLAs'],oportunidades:[{tipo:'RPA',desc:'Automação de cadastros'},{tipo:'Agente IA',desc:'Qualificação de leads'},{tipo:'RPA',desc:'Follow-up automático'},{tipo:'Agente IA',desc:'Proposta automatizada'}],quick_wins:['Mapear processo real','Template de proposta','Configurar SLA no CRM'],conversao_atual:'8%',conversao_meta:'15%',roi:'R$ 230.400'}; }
+      downloadBlob(generateInfographic(d, today), 'infografico-' + sessionName + '.svg', 'image/svg+xml');
+
+    // ── MAPA MENTAL ───────────────────────────────────────────────────────────
+    } else if (type === 'mindmap') {
+      const raw = await callAIForReport(REPORT_SYSTEM,
+        `Extraia os dados do diagnóstico e retorne APENAS JSON válido:
+{"centro":"Nome do Processo","ramos":[
+{"label":"Situação Atual","cor":"#1A73E8","filhos":["etapa1 real","etapa2 real","etapa3 real","etapa4 real"]},
+{"label":"Gargalos","cor":"#ff6b6b","filhos":["gargalo1 real","gargalo2 real","gargalo3 real"]},
+{"label":"Oportunidades IA","cor":"#5fcb8e","filhos":["oportunidade1","oportunidade2","oportunidade3"]},
+{"label":"TO-BE","cor":"#e8c872","filhos":["melhoria1","melhoria2","melhoria3"]},
+{"label":"Roadmap","cor":"#a78bfa","filhos":["0-3m: ação específica","3-6m: ação específica","6-12m: ação específica"]},
+{"label":"Impacto","cor":"#f97316","filhos":["métrica1","métrica2","ROI estimado"]}
+]}
+CONVERSA: ${conversation}`
+      );
+      let d;
+      try { d = JSON.parse(raw.replace(/```json|```/g,'').trim()); }
+      catch(e) { d = {centro:'Processo',ramos:[{label:'AS-IS',cor:'#1A73E8',filhos:['Etapa 1','Etapa 2']},{label:'Gargalos',cor:'#ff6b6b',filhos:['Gargalo 1']},{label:'TO-BE',cor:'#5fcb8e',filhos:['Melhoria 1']},{label:'Roadmap',cor:'#a78bfa',filhos:['0-3m','3-6m','6-12m']}]}; }
+      downloadBlob(generateMindMap(d, sessionName), 'mapa-mental-' + sessionName + '.html', 'text/html');
+
+    // ── APRESENTAÇÃO ──────────────────────────────────────────────────────────
+    } else if (type === 'pptx') {
+      const raw = await callAIForReport(REPORT_SYSTEM,
+        `Com base no diagnóstico, crie uma APRESENTAÇÃO EXECUTIVA COMPLETA. Retorne APENAS JSON:
+{"titulo":"Diagnóstico de Processos","cliente":"${sessionName}","slides":[
+{"titulo":"Capa","tipo":"cover","conteudo":"Diagnóstico Operacional com IA — Colink Business Consulting"},
+{"titulo":"Agenda","tipo":"bullets","conteudo":["Contexto e metodologia","Diagnóstico 10 Steps","Situação atual (AS-IS)","Oportunidades de IA","Roadmap e próximos passos","Impacto financeiro"]},
+{"titulo":"Resultado 10 Steps","tipo":"table","conteudo":[["Step","Resultado","Ação"],["1 - Processo mapeado","SIM/NÃO","ação real"],["2 - Processo estável","SIM/NÃO","ação real"],["3 - Dados íntegros","SIM/NÃO","ação real"],["4 - Gargalo identificado","SIM/NÃO","ação real"],["5 - Padrão definido","SIM/NÃO","ação real"]]},
+{"titulo":"Situação Atual — AS-IS","tipo":"bullets","conteudo":["etapa1 real do processo","etapa2 real","etapa3 real","etapa4 gargalo","etapa5 gargalo"]},
+{"titulo":"Gargalos Críticos","tipo":"bullets","conteudo":["gargalo1 com impacto","gargalo2 com impacto","gargalo3 com impacto"]},
+{"titulo":"Oportunidades de IA","tipo":"table","conteudo":[["Oportunidade","Tipo","Impacto","Esforço"],["oportunidade1","RPA/Agente","Alto","Baixo"],["oportunidade2","RPA/Agente","Alto","Médio"],["oportunidade3","RPA/Agente","Médio","Alto"]]},
+{"titulo":"Benchmark de Mercado","tipo":"table","conteudo":[["Métrica","Mercado","Empresa Atual","Meta"],["Taxa de conversão","12-18%","8%","15%"],["Tempo resp. lead","<2h","4-8h","<2h"],["Adoção CRM","75%","30%","90%"]]},
+{"titulo":"Matriz de Risco","tipo":"table","conteudo":[["Risco","Probabilidade","Impacto","Score"],["Resistência da equipe","Alta","Médio","Alto"],["Dados sujos no CRM","Alta","Alto","Crítico"],["Falta de governança","Média","Alto","Alto"]]},
+{"titulo":"Roadmap de Transformação","tipo":"bullets","conteudo":["0-3m (Estruturar): ações específicas reais","3-6m (Digitalizar): ações específicas reais","6-12m (Automatizar): ações específicas reais com IA"]},
+{"titulo":"Impacto Financeiro","tipo":"table","conteudo":[["Indicador","Atual","Projetado","Variação"],["Conversão","8%","15%","+87%"],["Clientes/mês","6","12","+6"],["Receita MRR","valor","valor","+R$ X.XXX"]]},
+{"titulo":"Próximos Passos","tipo":"bullets","conteudo":["1. ação imediata com owner e prazo","2. ação imediata","3. ação imediata","4. ação imediata","5. ação imediata"]}
+]}
+CONVERSA: ${conversation}`
+      );
+      let d;
+      try { d = JSON.parse(raw.replace(/```json|```/g,'').trim()); }
+      catch(e) { d = {titulo:'Diagnóstico',cliente:sessionName,slides:[{titulo:'Diagnóstico',tipo:'cover',conteudo:'Colink Business Consulting'}]}; }
+      downloadBlob(generatePPTPreview(d, today), 'apresentacao-' + sessionName + '.html', 'text/html');
+
+    // ── EMAIL ─────────────────────────────────────────────────────────────────
+    } else if (type === 'email') {
+      const email = await callAIForReport(REPORT_SYSTEM,
+        `Com base no diagnóstico, redija um EMAIL PROFISSIONAL COMPLETO de encaminhamento do relatório.
+
+EMPRESA: ${sessionName} ${sessionCode} | DATA: ${today}
+CONVERSA: ${conversation}
+
+Estrutura obrigatória:
+Assunto: [assunto impactante e específico]
+
+[corpo do email com]:
+- Saudação personalizada
+- Contexto da reunião/diagnóstico
+- 3-4 parágrafos: resumo dos achados, principais problemas identificados, oportunidades mapeadas
+- Destaque do ROI/impacto financeiro estimado
+- Lista dos outputs gerados em anexo
+- Próximos passos claros com call to action
+- Assinatura profissional Colink`
+      );
+      downloadBlob(email, 'email-encaminhamento-' + sessionName + '.txt', 'text/plain;charset=utf-8');
+    }
+
+  } catch(e) {
+    alert('Erro ao gerar: ' + e.message);
+    console.error(e);
+  }
+  setCardGenerating(type, false);
+}
+
+
+function generateInfographic(d, today) {
+  const W=900, H=620;
+  const levels=['CAÓTICO','DEFINIDO','PADRONIZADO','DIGITALIZADO','AUTOMATIZADO','INTELIGENTE'];
+  const lColors=['#ff6b6b','#f97316','#e8c872','#6e9aff','#5fcb8e','#a78bfa'];
+  let svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+W+' '+H+'" width="'+W+'" height="'+H+'">'
+    +'<defs><style>text{font-family:Arial,sans-serif}</style></defs>'
+    +'<rect width="'+W+'" height="'+H+'" fill="#0d0e11" rx="16"/>'
+    +'<rect x="0" y="0" width="6" height="'+H+'" fill="#e8c872" rx="3"/>'
+    +'<text x="28" y="42" font-size="11" fill="#7a7f8e" letter-spacing="2">COLINK · DIAGNÓSTICO DE PROCESSOS</text>'
+    +'<text x="28" y="70" font-size="20" fill="white" font-weight="bold">'+(d.cliente||'Cliente')+' — '+(d.processo||'Processo')+'</text>'
+    +'<text x="28" y="90" font-size="11" fill="#7a7f8e">'+today+'</text>'
+    +'<line x1="28" y1="102" x2="'+(W-28)+'" y2="102" stroke="#252830" stroke-width="1"/>'
+    +'<text x="28" y="124" font-size="10" fill="#7a7f8e" letter-spacing="2">NÍVEL DE MATURIDADE</text>';
+  const lw=(W-56)/6;
+  levels.forEach((lbl,i)=>{
+    const x=28+i*lw, active=i===(d.nivel||0);
+    svg+='<rect x="'+(x+2)+'" y="130" width="'+(lw-4)+'" height="34" fill="'+(active?lColors[i]:'#1c1f27')+'" rx="5" opacity="'+(active?1:0.5)+'"/>'
+      +'<text x="'+(x+lw/2)+'" y="152" font-size="9" fill="'+(active?'#0d0e11':'#7a7f8e')+'" text-anchor="middle" font-weight="'+(active?'bold':'normal')+'">'+lbl+'</text>';
+  });
+  svg+='<text x="28" y="190" font-size="10" fill="#7a7f8e" letter-spacing="2">GARGALOS</text>';
+  (d.gargalos||[]).slice(0,3).forEach((g,i)=>{
+    svg+='<rect x="'+(28+i*290)+'" y="198" width="278" height="32" fill="rgba(255,107,107,0.12)" rx="5"/>'
+      +'<rect x="'+(28+i*290)+'" y="198" width="4" height="32" fill="#ff6b6b" rx="2"/>'
+      +'<text x="'+(38+i*290)+'" y="218" font-size="11" fill="#ff6b6b">'+g.slice(0,38)+'</text>';
+  });
+  svg+='<text x="28" y="260" font-size="10" fill="#7a7f8e" letter-spacing="2">OPORTUNIDADES DE IA</text>';
+  (d.oportunidades||[]).slice(0,4).forEach((op,i)=>{
+    const col=i%2,row=Math.floor(i/2),x=28+col*438,y=268+row*46;
+    const color=op.tipo&&op.tipo.includes('RPA')?'#6e9aff':'#5fcb8e';
+    svg+='<rect x="'+x+'" y="'+y+'" width="426" height="36" fill="rgba(30,37,53,0.8)" rx="5"/>'
+      +'<rect x="'+x+'" y="'+y+'" width="4" height="36" fill="'+color+'" rx="2"/>'
+      +'<text x="'+(x+10)+'" y="'+(y+14)+'" font-size="9" fill="'+color+'" font-weight="bold">'+(op.tipo||'IA')+'</text>'
+      +'<text x="'+(x+10)+'" y="'+(y+28)+'" font-size="11" fill="#c8d0e0">'+(op.desc||'').slice(0,55)+'</text>';
+  });
+  svg+='<text x="28" y="384" font-size="10" fill="#7a7f8e" letter-spacing="2">QUICK WINS</text>';
+  (d.quick_wins||[]).slice(0,3).forEach((qw,i)=>{
+    svg+='<rect x="'+(28+i*290)+'" y="392" width="278" height="32" fill="rgba(232,200,114,0.08)" rx="5"/>'
+      +'<rect x="'+(28+i*290)+'" y="392" width="4" height="32" fill="#e8c872" rx="2"/>'
+      +'<text x="'+(38+i*290)+'" y="412" font-size="11" fill="#e8c872">'+qw.slice(0,38)+'</text>';
+  });
+  svg+='<rect x="0" y="'+(H-36)+'" width="'+W+'" height="36" fill="rgba(0,0,0,0.4)"/>'
+    +'<text x="28" y="'+(H-14)+'" font-size="10" fill="#7a7f8e">Colink Business Consulting</text>'
+    +'<text x="'+(W-28)+'" y="'+(H-14)+'" font-size="10" fill="#7a7f8e" text-anchor="end">'+today+'</text>'
+    +'</svg>';
+  return svg;
+}
+
+function generateMindMap(d, sessionName) {
+  const ramos = d.ramos || [];
+  let nodes = '<div class="center-node" style="left:450px;top:290px;">' + (d.centro||'Processo') + '</div>\n';
+  let leaves = '';
+  let svgLines = '';
+  ramos.forEach((r,i,arr) => {
+    const angle = (i/arr.length)*2*Math.PI - Math.PI/2;
+    const bx=450+Math.cos(angle)*200, by=290+Math.sin(angle)*160;
+    nodes += '<div class="branch-node" id="b'+i+'" style="left:'+bx+'px;top:'+by+'px;background:'+r.cor+';">'+r.label+'</div>\n';
+    svgLines += 'line(450,290,'+bx+','+by+',"'+r.cor+'",2);';
+    (r.filhos||[]).forEach((f,j,fa) => {
+      const la=angle+(j-(fa.length-1)/2)*0.45;
+      const lx=bx+Math.cos(la)*155, ly=by+Math.sin(la)*100;
+      leaves += '<div class="leaf-node" id="l'+i+'_'+j+'" style="left:'+lx+'px;top:'+ly+'px;">'+f+'</div>\n';
+      svgLines += 'line('+bx+','+by+','+lx+','+ly+',"'+r.cor+'",1);';
+    });
+  });
+  return '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Mapa Mental — '+sessionName+'</title>'
+    +'<style>*{box-sizing:border-box;margin:0;padding:0;}body{background:#0d0e11;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:Arial,sans-serif;padding:24px;}'
+    +'h2{color:#e8c872;font-family:Georgia,serif;font-size:18px;margin-bottom:20px;}.mm-wrap{position:relative;width:900px;height:580px;}'
+    +'svg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;}'
+    +'.center-node{position:absolute;transform:translate(-50%,-50%);background:linear-gradient(135deg,#1A73E8,#0F1B35);color:white;border-radius:50%;width:130px;height:130px;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:bold;font-size:13px;padding:14px;z-index:10;}'
+    +'.branch-node{position:absolute;transform:translate(-50%,-50%);border-radius:10px;padding:9px 16px;font-size:12px;font-weight:bold;color:white;text-align:center;z-index:8;}'
+    +'.leaf-node{position:absolute;transform:translate(-50%,-50%);background:#1c1f27;border:1px solid #252830;border-radius:8px;padding:6px 10px;font-size:11px;color:#c8d0e0;text-align:center;z-index:6;max-width:145px;}'
+    +'footer{color:#7a7f8e;font-size:11px;margin-top:20px;}</style></head><body>'
+    +'<h2>Mapa Mental — '+sessionName+'</h2><div class="mm-wrap">'
+    +'<svg id="svgLines"></svg>' + nodes + leaves
+    +'</div><footer>Colink Business Consulting</footer>'
+    +'<script>window.onload=function(){var svg=document.getElementById("svgLines");svg.setAttribute("viewBox","0 0 900 580");function line(x1,y1,x2,y2,color,w){var l=document.createElementNS("http://www.w3.org/2000/svg","line");l.setAttribute("x1",x1);l.setAttribute("y1",y1);l.setAttribute("x2",x2);l.setAttribute("y2",y2);l.setAttribute("stroke",color);l.setAttribute("stroke-width",w);l.setAttribute("opacity","0.5");svg.appendChild(l);}'+svgLines+'};' + '<\/script></body></html>';
+}
+
+function generatePPTPreview(d, today) {
+  const slides = d.slides || [];
+  return '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Apresentação — '+(d.cliente||'Cliente')+'</title>'
+    +'<style>*{box-sizing:border-box;margin:0;padding:0;}body{background:#1a1a2e;font-family:Arial,sans-serif;padding:32px;}'
+    +'h1{color:#e8c872;font-size:18px;margin-bottom:24px;font-style:italic;}'
+    +'.slide{background:#0F1B35;border-radius:14px;padding:36px 40px;margin-bottom:22px;max-width:820px;border-left:5px solid #e8c872;}'
+    +'.slide-num{font-size:10px;color:#7a7f8e;letter-spacing:2px;margin-bottom:8px;}'
+    +'.slide-title{font-size:22px;font-weight:bold;color:#e8c872;margin-bottom:16px;}'
+    +'.slide-body{font-size:14px;color:#c8d0e0;line-height:1.8;}'
+    +'.slide-body li{list-style:none;padding-left:16px;position:relative;margin-bottom:6px;}'
+    +'.slide-body li::before{content:"→";position:absolute;left:0;color:#e8c872;}'
+    +'table{border-collapse:collapse;width:100%;}th{background:rgba(232,200,114,.2);color:#e8c872;padding:8px;text-align:left;}'
+    +'td{padding:8px;color:#c8d0e0;border-bottom:1px solid rgba(255,255,255,.05);}'
+    +'footer{color:#7a7f8e;font-size:11px;text-align:center;margin-top:20px;}</style></head><body>'
+    +'<h1>Apresentação — '+(d.cliente||'Cliente')+' · '+today+'</h1>'
+    + slides.map((sl,i) => '<div class="slide"><div class="slide-num">SLIDE '+(i+1)+' / '+slides.length+'</div><div class="slide-title">'+sl.titulo+'</div><div class="slide-body">'
+      + (sl.tipo==='bullets' && Array.isArray(sl.conteudo) ? '<ul>'+sl.conteudo.map(b=>'<li>'+b+'</li>').join('')+'</ul>'
+        : sl.tipo==='table' && Array.isArray(sl.conteudo) ? '<table><thead><tr>'+sl.conteudo[0].map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+sl.conteudo.slice(1).map(r=>'<tr>'+r.map(c=>'<td>'+c+'</td>').join('')+'</tr>').join('')+'</tbody></table>'
+        : '<p>'+(sl.conteudo||'')+'</p>')
+      + '</div></div>').join('')
+    + '<footer>Colink Business Consulting · colink.com.br</footer></body></html>';
+}
+
+showSessionModal();
+loadSessionList();
+</script>
+
+<!-- REPORTS MODAL -->
+<div class="reports-overlay" id="reportsModal" style="display:none;">
+  <div class="reports-modal">
+    <div class="reports-title">Gerar Relatórios</div>
+    <div class="reports-sub" id="reportsSub">Escolha o formato de saída baseado na conversa atual.</div>
+
+    <div id="reportsNoSession" class="no-session-msg" style="display:none;">
+      ⚠️ Nenhuma sessão ativa. Inicie ou retome uma sessão antes de gerar relatórios.
+    </div>
+
+    <div class="reports-grid" id="reportsGrid">
+
+      <div class="report-card" id="card-pdf" onclick="generateReport('pdf')">
+        <div class="r-icon">📄</div>
+        <div class="r-title">Relatório Executivo PDF</div>
+        <div class="r-desc">Diagnóstico completo com AS-IS, TO-BE, oportunidades de IA e roadmap em formato PDF profissional.</div>
+        <div class="r-badge">PDF</div>
+        <div class="r-spinner"><div class="spin">⟳</div><span>Gerando...</span></div>
+      </div>
+
+      <div class="report-card" id="card-pptx" onclick="generateReport('pptx')">
+        <div class="r-icon">📊</div>
+        <div class="r-title">Apresentação PowerPoint</div>
+        <div class="r-desc">Slides executivos com diagnóstico, matriz impacto × esforço e plano de ação para apresentar ao cliente.</div>
+        <div class="r-badge">PPTX</div>
+        <div class="r-spinner"><div class="spin">⟳</div><span>Gerando...</span></div>
+      </div>
+
+      <div class="report-card" id="card-excel" onclick="generateReport('excel')">
+        <div class="r-icon">📋</div>
+        <div class="r-title">Plano de Ação Excel</div>
+        <div class="r-desc">Planilha com iniciativas do roadmap, responsáveis, prazos, esforço e status — pronta para gestão.</div>
+        <div class="r-badge">XLSX</div>
+        <div class="r-spinner"><div class="spin">⟳</div><span>Gerando...</span></div>
+      </div>
+
+      <div class="report-card" id="card-spec" onclick="generateReport('spec')">
+        <div class="r-icon">📝</div>
+        <div class="r-title">Especificação Funcional</div>
+        <div class="r-desc">Documento Word com regras de negócio, entradas, saídas, validações e fluxo detalhado do processo.</div>
+        <div class="r-badge">DOCX</div>
+        <div class="r-spinner"><div class="spin">⟳</div><span>Gerando...</span></div>
+      </div>
+
+      <div class="report-card" id="card-infographic" onclick="generateReport('infographic')">
+        <div class="r-icon">🎨</div>
+        <div class="r-title">Infográfico Visual</div>
+        <div class="r-desc">Resumo visual do diagnóstico com ícones, níveis de maturidade e oportunidades em formato SVG.</div>
+        <div class="r-badge">SVG</div>
+        <div class="r-spinner"><div class="spin">⟳</div><span>Gerando...</span></div>
+      </div>
+
+      <div class="report-card" id="card-mindmap" onclick="generateReport('mindmap')">
+        <div class="r-icon">🧠</div>
+        <div class="r-title">Mapa Mental</div>
+        <div class="r-desc">Estrutura visual interativa do diagnóstico com processos, problemas e soluções organizados em nós.</div>
+        <div class="r-badge">HTML</div>
+        <div class="r-spinner"><div class="spin">⟳</div><span>Gerando...</span></div>
+      </div>
+
+      <div class="report-card" id="card-email" onclick="generateReport('email')" style="grid-column:span 2;">
+        <div class="r-icon">📧</div>
+        <div class="r-title">Email de Encaminhamento</div>
+        <div class="r-desc">Rascunho profissional para enviar ao cliente com resumo do diagnóstico, principais achados e próximos passos.</div>
+        <div class="r-badge">TXT</div>
+        <div class="r-spinner"><div class="spin">⟳</div><span>Gerando...</span></div>
+      </div>
+
+    </div>
+
+    <button class="reports-close" onclick="hideReportsModal()">Fechar</button>
+  </div>
+</div>
+</body>
+</html>
