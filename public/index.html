@@ -1,0 +1,2777 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Colink — Diagnóstico de Processos</title>
+<!-- v1776950542 -->
+<style>
+/* ── RESET & TOKENS ───────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:           #09090B;
+  --surface:      #0F1117;
+  --surface2:     #18181B;
+  --surface3:     #27272A;
+  --border:       #27272A;
+  --border-subtle:#1F1F23;
+  --text:         #FAFAFA;
+  --text-muted:   #71717A;
+  --text-subtle:  #52525B;
+  --accent:       #E8C872;
+  --accent-fg:    #0A0A0A;
+  --blue:         #3B82F6;
+  --green:        #22C55E;
+  --red:          #EF4444;
+  --amber:        #F59E0B;
+  --r-sm:         4px;
+  --r-md:         6px;
+  --r-lg:         8px;
+}
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; font-size: 14px; line-height: 1.5; overflow: hidden; }
+
+/* ── APP SHELL ────────────────────────────────────────────────────── */
+.app { display: flex; height: 100vh; overflow: hidden; }
+
+/* ── SIDEBAR ──────────────────────────────────────────────────────── */
+.sidebar {
+  width: 240px; flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  height: 100vh; overflow: hidden;
+}
+.sidebar-brand {
+  height: 56px; display: flex; align-items: center; gap: 10px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.brand-mark {
+  width: 28px; height: 28px; border-radius: var(--r-md);
+  background: var(--accent); color: var(--accent-fg);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 12px; flex-shrink: 0;
+}
+.brand-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.brand-sub  { font-size: 10px; color: var(--text-muted); letter-spacing: .04em; }
+
+.sidebar-nav { flex: 1; padding: 8px; overflow-y: auto; }
+.nav-section { margin-bottom: 20px; }
+.nav-label {
+  font-size: 10px; font-weight: 600; letter-spacing: .08em;
+  color: var(--text-subtle); text-transform: uppercase;
+  padding: 0 8px; margin-bottom: 4px;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 8px; border-radius: var(--r-md);
+  font-size: 13px; font-weight: 500; color: var(--text-muted);
+  cursor: pointer; transition: background .15s, color .15s;
+  border: none; background: none; width: 100%; text-align: left;
+  text-decoration: none;
+}
+.nav-item:hover { background: var(--surface3); color: var(--text); }
+.nav-item.active { background: var(--surface3); color: var(--text); }
+.nav-item svg { width: 15px; height: 15px; flex-shrink: 0; }
+.nav-item .badge {
+  margin-left: auto; font-size: 10px; font-weight: 600;
+  background: var(--accent); color: var(--accent-fg);
+  padding: 1px 6px; border-radius: 10px;
+}
+
+.sidebar-session {
+  padding: 8px; border-top: 1px solid var(--border); flex-shrink: 0;
+}
+.session-pill {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: var(--r-md);
+  background: var(--surface2); border: 1px solid var(--border);
+}
+.session-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+.session-dot.idle { background: var(--text-subtle); }
+.session-info { flex: 1; min-width: 0; }
+.session-name { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.session-meta { font-size: 10px; color: var(--text-muted); }
+.session-btn {
+  font-size: 11px; font-weight: 600; color: var(--accent);
+  background: none; border: none; cursor: pointer; padding: 2px 4px;
+  border-radius: var(--r-sm); flex-shrink: 0;
+}
+.session-btn:hover { background: rgba(232,200,114,.1); }
+
+/* ── MAIN AREA ────────────────────────────────────────────────────── */
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+
+/* ── TOPBAR ───────────────────────────────────────────────────────── */
+.topbar {
+  height: 56px; flex-shrink: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 20px;
+}
+.topbar-title { font-size: 13px; font-weight: 600; color: var(--text); }
+.topbar-sub   { font-size: 11px; color: var(--text-muted); }
+.topbar-divider { width: 1px; height: 16px; background: var(--border); }
+
+.steps-row { display: flex; align-items: center; gap: 4px; flex: 1; }
+.step-pill {
+  display: flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: 20px;
+  font-size: 10px; font-weight: 600; letter-spacing: .04em;
+  background: var(--surface3); color: var(--text-muted);
+  border: 1px solid var(--border);
+  transition: all .15s; cursor: default; white-space: nowrap;
+}
+.step-pill.active { background: rgba(232,200,114,.12); color: var(--accent); border-color: rgba(232,200,114,.25); }
+.step-pill.done   { background: rgba(34,197,94,.08); color: var(--green); border-color: rgba(34,197,94,.2); }
+.step-pill-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+.topbar-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; flex-shrink: 0; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: var(--r-md);
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: all .15s; border: 1px solid transparent;
+  text-decoration: none;
+}
+.btn-ghost { background: none; border-color: transparent; color: var(--text-muted); }
+.btn-ghost:hover { background: var(--surface3); color: var(--text); border-color: var(--border); }
+.btn-outline { background: none; border-color: var(--border); color: var(--text-muted); }
+.btn-outline:hover { border-color: rgba(232,200,114,.3); color: var(--text); }
+.btn-primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.btn-primary:hover { background: #F5D78E; }
+.btn svg { width: 13px; height: 13px; }
+
+/* ── CHAT AREA ────────────────────────────────────────────────────── */
+.chat-wrap { flex: 1; overflow-y: auto; padding: 24px 32px; display: flex; flex-direction: column; gap: 4px; scroll-behavior: smooth; }
+.chat-wrap::-webkit-scrollbar { width: 4px; }
+.chat-wrap::-webkit-scrollbar-track { background: transparent; }
+.chat-wrap::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 4px; }
+
+.msg { display: flex; gap: 10px; max-width: 100%; }
+.msg.user { flex-direction: row-reverse; }
+
+.msg-avatar {
+  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; margin-top: 2px;
+}
+.msg.assistant .msg-avatar { background: var(--surface3); color: var(--text-muted); border: 1px solid var(--border); }
+.msg.user .msg-avatar { background: var(--accent); color: var(--accent-fg); }
+
+.bubble {
+  padding: 10px 14px; border-radius: var(--r-lg);
+  font-size: 13px; line-height: 1.65; max-width: 75%;
+  border: 1px solid transparent;
+}
+.msg.assistant .bubble { background: var(--surface2); border-color: var(--border); color: var(--text); border-radius: 2px var(--r-lg) var(--r-lg) var(--r-lg); }
+.msg.user .bubble { background: var(--surface3); border-color: var(--border); color: var(--text); border-radius: var(--r-lg) 2px var(--r-lg) var(--r-lg); }
+.bubble b, .bubble strong { font-weight: 600; color: var(--text); }
+.bubble table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 12px; }
+.bubble th { background: var(--surface3); padding: 6px 10px; text-align: left; font-weight: 600; font-size: 11px; border-bottom: 1px solid var(--border); }
+.bubble td { padding: 6px 10px; border-bottom: 1px solid var(--border-subtle); }
+.bubble code { background: var(--surface3); padding: 1px 5px; border-radius: var(--r-sm); font-size: 12px; font-family: monospace; }
+.bubble ul, .bubble ol { padding-left: 18px; margin: 4px 0; }
+.bubble li { margin-bottom: 3px; }
+.bubble h3 { font-size: 13px; font-weight: 600; margin: 10px 0 4px; }
+.bubble h2 { font-size: 14px; font-weight: 700; margin: 12px 0 6px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+.bubble h1 { font-size: 15px; font-weight: 700; margin: 14px 0 8px; }
+.bubble p { margin-bottom: 6px; }
+.bubble p:last-child { margin-bottom: 0; }
+
+/* Thinking bubble */
+.thinking { display: flex; align-items: center; gap: 5px; padding: 10px 14px; }
+.t-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--text-subtle); animation: tdot 1.2s ease-in-out infinite; }
+.t-dot:nth-child(2) { animation-delay: .2s; }
+.t-dot:nth-child(3) { animation-delay: .4s; }
+@keyframes tdot { 0%,80%,100%{transform:scale(0.8);opacity:.4} 40%{transform:scale(1.2);opacity:1} }
+
+/* File chips */
+.file-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.file-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: var(--r-md);
+  background: var(--surface3); border: 1px solid var(--border);
+  font-size: 11px; font-weight: 500; color: var(--text-muted);
+}
+.file-chip .chip-icon { font-size: 13px; }
+.file-chip .chip-remove {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--surface); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 9px; color: var(--text-subtle);
+  transition: all .15s;
+}
+.file-chip .chip-remove:hover { background: var(--red); color: white; border-color: var(--red); }
+
+/* Diagnosis banner */
+.diag-banner {
+  display: flex; align-items: center; gap: 12px;
+  margin: 8px 0; padding: 10px 14px;
+  background: rgba(34,197,94,.06); border: 1px solid rgba(34,197,94,.2);
+  border-radius: var(--r-lg); font-size: 12px;
+}
+.diag-banner-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+.diag-banner-text { color: var(--green); font-weight: 500; flex: 1; }
+.diag-banner-btn {
+  padding: 4px 10px; border-radius: var(--r-sm);
+  background: var(--green); color: #0A0A0A;
+  font-size: 11px; font-weight: 700; cursor: pointer;
+  border: none; white-space: nowrap;
+}
+
+/* Error bubble */
+.error-bubble {
+  margin: 4px 0 4px 38px; padding: 8px 12px;
+  background: rgba(239,68,68,.08); border: 1px solid rgba(239,68,68,.2);
+  border-radius: var(--r-md); font-size: 12px; color: var(--red);
+}
+
+/* ── INPUT AREA ───────────────────────────────────────────────────── */
+.input-wrap {
+  flex-shrink: 0; padding: 12px 20px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+.pending-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.input-row {
+  display: flex; align-items: flex-end; gap: 8px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--r-lg); padding: 8px 8px 8px 12px;
+  transition: border-color .15s;
+}
+.input-row:focus-within { border-color: rgba(232,200,114,.3); }
+.attach-btn {
+  width: 30px; height: 30px; border-radius: var(--r-md);
+  background: none; border: 1px solid var(--border);
+  color: var(--text-muted); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: all .15s;
+}
+.attach-btn:hover { border-color: rgba(232,200,114,.3); color: var(--accent); }
+.attach-btn svg { width: 14px; height: 14px; }
+#fileInput { display: none; }
+.msg-input {
+  flex: 1; background: none; border: none; outline: none;
+  font-size: 13px; color: var(--text); resize: none;
+  max-height: 120px; min-height: 22px; line-height: 1.5;
+  font-family: inherit;
+}
+.msg-input::placeholder { color: var(--text-subtle); }
+.send-btn {
+  width: 32px; height: 32px; border-radius: var(--r-md);
+  background: var(--accent); color: var(--accent-fg);
+  border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: all .15s;
+}
+.send-btn:hover { background: #F5D78E; }
+.send-btn:disabled { opacity: .4; cursor: not-allowed; }
+.send-btn svg { width: 14px; height: 14px; }
+.input-hint { margin-top: 6px; font-size: 10px; color: var(--text-subtle); display: flex; gap: 12px; }
+.input-hint kbd {
+  display: inline-flex; align-items: center;
+  padding: 1px 5px; border-radius: 3px;
+  background: var(--surface3); border: 1px solid var(--border);
+  font-size: 9px; font-family: inherit; margin-right: 3px;
+}
+
+/* ── SESSION MODAL ────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0,0,0,.75); backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.modal {
+  width: 100%; max-width: 480px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px; overflow: hidden;
+}
+.modal-header {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-title { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+.modal-sub { font-size: 12px; color: var(--text-muted); }
+.modal-body { padding: 16px 24px; }
+.field-label {
+  font-size: 11px; font-weight: 600; color: var(--text-muted);
+  letter-spacing: .06em; text-transform: uppercase;
+  display: block; margin-bottom: 6px;
+}
+.field-input {
+  width: 100%; padding: 9px 12px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--r-md); color: var(--text); font-size: 13px;
+  font-family: inherit; outline: none; transition: border-color .15s;
+}
+.field-input:focus { border-color: rgba(232,200,114,.4); }
+.field-input::placeholder { color: var(--text-subtle); }
+.modal-footer { padding: 12px 24px 20px; display: flex; flex-direction: column; gap: 12px; }
+.btn-create {
+  width: 100%; padding: 10px;
+  background: var(--accent); color: var(--accent-fg);
+  border: none; border-radius: var(--r-md);
+  font-size: 13px; font-weight: 700; cursor: pointer;
+  transition: background .15s;
+}
+.btn-create:hover { background: #F5D78E; }
+.divider-label { text-align: center; font-size: 11px; color: var(--text-subtle); position: relative; }
+.divider-label::before, .divider-label::after {
+  content: ''; position: absolute; top: 50%;
+  width: calc(50% - 60px); height: 1px; background: var(--border);
+}
+.divider-label::before { left: 0; }
+.divider-label::after  { right: 0; }
+
+/* Sessions list */
+.sessions-list { display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow-y: auto; }
+.sessions-list::-webkit-scrollbar { width: 3px; }
+.sessions-list::-webkit-scrollbar-thumb { background: var(--surface3); }
+.session-row {
+  display: flex; align-items: center;
+  padding: 10px 12px; border-radius: var(--r-md);
+  border: 1px solid var(--border); background: var(--surface2);
+  cursor: pointer; transition: all .15s;
+}
+.session-row:hover { border-color: rgba(232,200,114,.2); background: var(--surface3); }
+.session-row-badge {
+  font-size: 10px; font-weight: 700; padding: 2px 6px;
+  background: var(--accent); color: var(--accent-fg);
+  border-radius: 4px; margin-right: 10px; flex-shrink: 0;
+}
+.session-row-info { flex: 1; min-width: 0; }
+.session-row-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.session-row-meta { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+.session-row-arrow { color: var(--accent); font-size: 13px; flex-shrink: 0; margin-left: 8px; }
+
+/* ── MARKDOWN RENDERING ───────────────────────────────────────────── */
+.rendered-md { font-size: 13px; line-height: 1.7; }
+.rendered-md h1 { font-size: 15px; font-weight: 700; margin: 14px 0 8px; color: var(--text); }
+.rendered-md h2 { font-size: 14px; font-weight: 700; margin: 12px 0 6px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+.rendered-md h3 { font-size: 13px; font-weight: 600; margin: 10px 0 4px; color: var(--accent); }
+.rendered-md ul, .rendered-md ol { padding-left: 20px; margin: 4px 0; }
+.rendered-md li { margin-bottom: 3px; }
+.rendered-md code { background: var(--surface3); padding: 1px 5px; border-radius: var(--r-sm); font-size: 12px; font-family: 'Fira Code', monospace; }
+.rendered-md table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 12px; }
+.rendered-md th { background: var(--surface3); padding: 6px 10px; text-align: left; font-weight: 600; font-size: 11px; border: 1px solid var(--border); }
+.rendered-md td { padding: 6px 10px; border: 1px solid var(--border-subtle); vertical-align: top; }
+.rendered-md tr:nth-child(even) td { background: rgba(255,255,255,.02); }
+.rendered-md p { margin-bottom: 6px; }
+.rendered-md p:last-child { margin-bottom: 0; }
+.rendered-md strong { font-weight: 600; color: var(--text); }
+.rendered-md blockquote { border-left: 3px solid var(--accent); padding: 6px 12px; margin: 8px 0; background: rgba(232,200,114,.05); border-radius: 0 var(--r-md) var(--r-md) 0; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-mark">CO</div>
+      <div>
+        <div class="brand-name">Colink</div>
+        <div class="brand-sub">DIAGNÓSTICO COM IA</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section">
+        <div class="nav-label">Diagnóstico</div>
+        <button class="nav-item active" onclick="showSessionModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Conversa
+        </button>
+        <button class="nav-item" onclick="openReports()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Relatórios
+          <span class="badge">11</span>
+        </button>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">Sistema</div>
+        <a href="/admin.html" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          Admin
+        </a>
+      </div>
+    </nav>
+
+    <div class="sidebar-session">
+      <div class="session-pill" id="sessionPill">
+        <div class="session-dot idle" id="sessionDot"></div>
+        <div class="session-info">
+          <div class="session-name" id="sessionName">Nenhuma sessão</div>
+          <div class="session-meta" id="sessionCode">Clique para iniciar</div>
+        </div>
+        <button class="session-btn" onclick="showSessionModal()">Trocar</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- TOPBAR -->
+    <header class="topbar" id="sessionBar" style="display:none">
+      <div>
+        <div class="topbar-title" id="topbarTitle">—</div>
+        <div class="topbar-sub">Metodologia 10 Steps Colink</div>
+      </div>
+      <div class="topbar-divider"></div>
+      <div class="steps-row" id="stepsBar">
+        <!-- Steps pills injected by JS -->
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-outline" onclick="openReports()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Relatórios
+        </button>
+        <button class="btn btn-ghost" onclick="showSessionModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Nova sessão
+        </button>
+      </div>
+    </header>
+
+    <!-- CHAT -->
+    <div class="chat-wrap" id="chat"></div>
+
+    <!-- INPUT -->
+    <div class="input-wrap">
+      <div class="pending-chips" id="pendingChips"></div>
+      <div class="input-row">
+        <button class="attach-btn" onclick="document.getElementById('fileInput').click()" title="Anexar arquivo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        </button>
+        <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.txt,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.gif,.webp" onchange="handleFileSelect(event)">
+        <textarea id="msgInput" class="msg-input" placeholder="Responda ou envie um arquivo..." rows="1"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"
+          oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+        <button class="send-btn" onclick="send()" id="sendBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+      <div class="input-hint">
+        <span><kbd>Enter</kbd> enviar</span>
+        <span><kbd>Shift</kbd><kbd>Enter</kbd> nova linha</span>
+        <span><kbd>📎</kbd> anexar arquivo</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SESSION MODAL -->
+<div class="modal-overlay" id="sessionModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Sessões de Diagnóstico</div>
+      <div class="modal-sub">Inicie uma nova sessão ou retome uma existente.</div>
+    </div>
+    <div class="modal-body">
+      <label class="field-label" for="clientNameInput">Nome do cliente / empresa</label>
+      <input type="text" id="clientNameInput" class="field-input"
+        placeholder="Ex: TechVendas Ltda, Supermercado ABC..."
+        onkeydown="if(event.key==='Enter')createSession()">
+    </div>
+    <div class="modal-footer">
+      <button class="btn-create" onclick="createSession()">Criar sessão</button>
+      <div class="divider-label">ou retome uma sessão existente</div>
+      <div class="sessions-list" id="sessionsList"></div>
+    </div>
+  </div>
+</div>
+
+
+<script>
+
+const SYSTEM_PROMPT = `Você é um consultor sênior da Colink Business Consulting, especializado em diagnóstico operacional e automação de processos com IA.
+
+Você conduz entrevistas diagnósticas profundas usando a Metodologia 10 Steps Colink. Seu diferencial é usar os dados reais dos arquivos enviados pelo cliente como base de análise — não apenas como anexo, mas como evidência concreta do diagnóstico.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+OS 10 STEPS COLINK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+| Step | Pergunta diagnóstica | SIM | NÃO |
+|------|---------------------|-----|-----|
+| 1 | O processo está mapeado como realmente ocorre? | → Step 2 | → Mapear o processo real |
+| 2 | O processo é estável? | → Step 3 | → Estabilizar |
+| 3 | Os dados são íntegros e consistentes? | → Step 4 | → Elevar maturidade dos dados |
+| 4 | O gargalo está identificado? | → Step 5 | → Identificar o gargalo |
+| 5 | Existe padrão operacional definido? | → Step 6 | → Padronizar |
+| 6 | Há oportunidades reais de melhoria? | → Melhorar | → Step 7 |
+| 7 | O processo é repetitivo e com baixa ambiguidade? | → Step 8 | → Reduzir ambiguidade |
+| 8 | Automação por regras ou por agentes de IA? | → RPA | → Step 9 |
+| 9 | Os limites de autonomia dos agentes estão definidos? | → Step 10 | → Definir autonomia |
+| 10 | A governança pós-automação está preparada? | → Implementar | → Estabelecer governança |
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REGRA #1 — UMA PERGUNTA POR VEZ (INVIOLÁVEL)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NUNCA faça duas perguntas na mesma mensagem. Uma pergunta. Ponto.
+- ERRADO: "Entendi o Step 7. Agora o Step 8: você prefere RPA ou Agentes de IA?"
+- CERTO: "Para o Step 8: o processo tem regras fixas (RPA) ou variações e texto livre (Agente IA)?"
+Comentar o step anterior + fazer a próxima pergunta = UMA mensagem. Mas apenas UMA pergunta no final.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REGRA #2 — ANÁLISE PROFUNDA DE ARQUIVOS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Quando o usuário enviar arquivos, você deve:
+
+A) CONFIRMAR e ANALISAR IMEDIATAMENTE:
+   - Informe quais arquivos recebeu e o que identificou neles
+   - Extraia métricas, números, fórmulas, padrões e anomalias REAIS
+   - Cite dados específicos: "Vi que sua planilha tem 20 leads com taxa de conversão de 8%..."
+
+B) FAZER PERGUNTAS BASEADAS NOS DADOS REAIS:
+   Planilha Excel → analise: volumes, fórmulas, métricas, gargalos nos dados, padrões temporais
+   Exemplo: "Na sua planilha identifiquei 3 leads com mais de 10 dias sem atividade (LD-006, LD-011, LD-013). Isso é frequente ou foi pontual?"
+
+   Documento Word/PDF → analise: fluxo descrito, inconsistências, ausência de padrões, problemas mencionados
+   Exemplo: "No POP que você enviou, notei que o Step 4 (qualificação) não tem critérios definidos. Quanto tempo em média um SDR gasta nessa etapa?"
+
+   Print de tela/imagem → analise: interface, dados visíveis, problemas de UX, campos em branco
+   Exemplo: "No print do HubSpot vejo que 40% dos campos de qualificação estão vazios. Isso é padrão ou o time não sabe como preencher?"
+
+C) USAR OS DADOS COMO EVIDÊNCIA durante os 10 Steps:
+   - Ao avaliar Step 3 (integridade de dados): cite as duplicatas reais da planilha
+   - Ao avaliar Step 4 (gargalo): cite os leads parados por mais de X dias
+   - Ao avaliar Step 5 (padrão): cite a ausência de template no documento
+   - Ao calcular impacto: use os números reais (volume de leads, ticket médio, conversão)
+
+D) DETECTAR automaticamente nas planilhas:
+   - Taxa de conversão atual vs potencial
+   - Leads parados (sem atividade há N dias)
+   - Duplicatas ou inconsistências
+   - Etapas com maior perda no funil
+   - Valores médios de negócios
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REGRA #3 — PERGUNTAS DE APROFUNDAMENTO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Além dos 10 Steps, faça perguntas extras baseadas nos dados dos arquivos:
+- Se planilha mostra leads parados → "Qual é o protocolo atual quando um lead fica sem resposta por 7 dias?"
+- Se POP tem lacunas → "Quem define quando um lead está pronto para o closer?"
+- Se CRM tem campos vazios → "O time sabe o que deve ser preenchido em cada etapa?"
+- Se há inconsistências nos dados → "Como vocês garantem a qualidade dos dados no CRM hoje?"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REGRA #4 — DIAGNÓSTICO COMPLETO AO FINAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Após os 10 Steps, gere OBRIGATORIAMENTE o diagnóstico completo com:
+
+## DIAGNÓSTICO COMPLETO — [EMPRESA]
+
+### Nível de Maturidade: [NÍVEL X — NOME]
+[Justificativa com dados reais dos arquivos]
+
+### Resultado dos 10 Steps
+| Step | Pergunta | Resultado | Evidência dos Arquivos | Ação |
+[Use dados reais dos arquivos como evidência]
+
+### AS-IS — Situação Atual
+[Etapas reais com problemas identificados nos arquivos]
+
+### Gargalos Identificados (com evidências dos dados)
+[Cite números reais: "X leads parados há Y dias", "Z% de duplicatas", etc.]
+
+### TO-BE — Processo Futuro com IA
+[Redesenho usando os dados reais como base]
+
+### Oportunidades de IA
+| Oportunidade | Tipo | Impacto | Esforço | Quick Win? |
+[Baseado nos dados reais dos arquivos]
+
+### Impacto Financeiro (com cálculo real)
+[Use ticket médio, volume e conversão REAIS dos arquivos para calcular ROI]
+
+### Roadmap
+0-3m / 3-6m / 6-12m com ações específicas baseadas nos dados
+
+### Próximos 5 Passos Imediatos
+[Ações concretas com owner e prazo]
+
+---
+⚡ *Diagnóstico gerado pela Colink IA com base na conversa e nos arquivos enviados. Clique em **📄 Relatórios** para baixar PDF, PPTX, Excel, BPMN e mais.*
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FRAMEWORK DE IA COLINK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Princípio: estruturar → padronizar → digitalizar → automatizar → agentes de IA.
+
+RPA/Workflow: regras fixas, entradas padronizadas, 1 resposta correta
+Agentes IA: variações, texto livre, "80% correto" gera valor, alto volume
+
+Níveis de maturidade:
+NÍVEL 0 CAÓTICO → Mapear o processo
+NÍVEL 1 DEFINIDO → Padronizar + POP
+NÍVEL 2 PADRONIZADO → Identificar melhorias
+NÍVEL 3 DIGITALIZADO → Automação por regras
+NÍVEL 4 AUTOMATIZADO → Agentes de IA
+NÍVEL 5 INTELIGENTE → Otimizar e expandir
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FLUXO DE INÍCIO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Cumprimente e pergunte APENAS: qual empresa e setor?
+2. Após resposta → APENAS: qual processo diagnosticar?
+3. Após resposta → APENAS: tem arquivos para compartilhar? (planilhas, POPs, prints de CRM, propostas, etc.)
+   Incentive: "Quanto mais arquivos você enviar, mais preciso e detalhado será o diagnóstico."
+4. Ao receber arquivos → ANALISE-OS IMEDIATAMENTE conforme Regra #2
+5. Inicie os 10 Steps usando os dados dos arquivos como base
+6. Após Step 10 → gere o DIAGNÓSTICO COMPLETO (Regra #4)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TOM E ESTILO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Consultivo, direto e analítico
+- Cite sempre dados específicos dos arquivos — nunca generalize quando tem dados reais
+- Português do Brasil
+- Use tabelas para apresentar análises de dados
+- Não invente dados — se não tiver, diga que não encontrou e pergunte
+- Mostre que leu os arquivos: "Na planilha que você enviou vi que..."
+- Calcule impactos financeiros com os números reais quando disponíveis`;
+
+let currentSessionId = null;
+let currentStep = 1;
+let isLoading = false;
+let pendingFiles = []; // multiple files support
+let sessionFileContents = []; // stores ALL file contents uploaded in this session
+
+const chat = document.getElementById("chat");
+const inputBox = document.getElementById("inputBox");
+const sendBtn = document.getElementById("sendBtn");
+
+// ── STEPS ────────────────────────────────────────────────────────────────────
+function updateSteps(step) {
+  currentStep = step;
+  const bar = document.getElementById("stepsBar");
+  if (!bar) return;
+  const labels = ["Inventário","Entrevista","Análise","AS-IS/TO-BE","Roadmap"];
+  bar.innerHTML = labels.map((l,i) => {
+    const n = i+1;
+    const cls = n < step ? "step-pill done" : n === step ? "step-pill active" : "step-pill";
+    const dot = n < step ? '<span class="step-pill-dot"></span>' : '';
+    return `<div class="${cls}">${dot}${n}·${l}</div>`;
+  }).join("");
+}
+
+// ── MESSAGES ─────────────────────────────────────────────────────────────────
+function addMessage(role, content, imgSrc, save = true) {
+  const msg = document.createElement("div");
+  msg.className = `msg ${role === "user" ? "user" : "assistant"}`;
+  const avatar = document.createElement("div");
+  avatar.className = "msg-avatar";
+  avatar.textContent = role === "user" ? "VC" : "CO";
+  msg.appendChild(avatar);
+  const bubble = document.createElement("div");
+  bubble.className = "bubble rendered-md";
+
+  if (imgSrc) {
+    const img = document.createElement("img");
+    img.src = imgSrc; img.className = "chat-img";
+    bubble.appendChild(img);
+    if (content) {
+      const p = document.createElement("p");
+      p.style.marginTop = "6px";
+      p.innerHTML = formatMarkdown(content);
+      bubble.appendChild(p);
+    }
+  } else {
+    bubble.innerHTML = formatMarkdown(content);
+  }
+
+  msg.appendChild(label); msg.appendChild(bubble);
+  chat.appendChild(msg);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+// ── MARKDOWN ──────────────────────────────────────────────────────────────────
+function formatMarkdown(text) {
+  text = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+  text = text.replace(/\*(.*?)\*/g, "<em>$1</em>");
+  text = text.replace(/^### (.+)$/gm, "<p style=\"font-size:12px;font-weight:600;color:var(--accent);margin-top:12px;margin-bottom:4px;letter-spacing:.04em;text-transform:uppercase;\">$1</p>");
+  text = text.replace(/^## (.+)$/gm, "<p style=\"font-family:\'DM Serif Display\',serif;font-size:15px;margin-top:12px;margin-bottom:6px;\">$1</p>");
+  text = text.replace(/^# (.+)$/gm, "<p style=\"font-family:\'DM Serif Display\',serif;font-size:17px;color:var(--accent);margin-bottom:8px;\">$1</p>");
+  text = parseTable(text);
+  text = text.replace(/^[-•] (.+)$/gm, "<li>$1</li>");
+  text = text.replace(/^\d+\. (.+)$/gm, "<li>$1</li>");
+  text = text.replace(/`([^`]+)`/g, "<code style=\"background:rgba(255,255,255,.07);padding:2px 6px;border-radius:4px;font-family:monospace;font-size:12px;\">$1</code>");
+  text = text.replace(/^---$/gm, "<hr style=\"border:none;border-top:1px solid var(--border);margin:10px 0;\">");
+  text = text.split("\n\n").map(p => {
+    if (p.trim() && !p.includes("<table") && !p.includes("<ul") && !p.includes("<p ") && !p.includes("<hr")) {
+      return `<p>${p.replace(/\n/g, "<br>")}</p>`;
+    }
+    return p;
+  }).join("\n");
+  return text;
+}
+
+function parseTable(text) {
+  const lines = text.split("\n");
+  let result = [], inTable = false, tableHtml = "";
+  for (const line of lines) {
+    if (line.trim().startsWith("|")) {
+      if (!inTable) {
+        inTable = true;
+        tableHtml = "<table><thead><tr>";
+        line.split("|").filter(c => c.trim()).forEach(h => { tableHtml += `<th>${h.trim()}</th>`; });
+        tableHtml += "</tr></thead><tbody>";
+      } else if (line.includes("---")) { continue; }
+      else {
+        tableHtml += "<tr>";
+        line.split("|").slice(1, -1).forEach(c => { tableHtml += `<td>${c.trim()}</td>`; });
+        tableHtml += "</tr>";
+      }
+    } else {
+      if (inTable) { tableHtml += "</tbody></table>"; result.push(tableHtml); inTable = false; tableHtml = ""; }
+      result.push(line);
+    }
+  }
+  if (inTable) { tableHtml += "</tbody></table>"; result.push(tableHtml); }
+  return result.join("\n");
+}
+
+// ── THINKING ──────────────────────────────────────────────────────────────────
+function showThinking() {
+  const msg = document.createElement("div");
+  msg.className = "msg assistant"; msg.id = "thinking";
+  const av = document.createElement("div");
+  av.className = "msg-avatar"; av.textContent = "CO";
+  const bub = document.createElement("div");
+  bub.className = "bubble";
+  bub.innerHTML = '<div class="thinking"><div class="t-dot"></div><div class="t-dot"></div><div class="t-dot"></div></div>';
+  msg.appendChild(av); msg.appendChild(bub);
+  document.getElementById("chat").appendChild(msg);
+  msg.scrollIntoView({ behavior: "smooth" });
+}
+function removeThinking() { const t = document.getElementById("thinking"); if (t) t.remove(); }
+
+// ── SESSION MODAL ─────────────────────────────────────────────────────────────
+function showSessionModal() {
+  document.getElementById("sessionModal").style.display = "flex";
+  document.getElementById("clientName").value = "";
+  document.getElementById("newSessionError").textContent = "";
+  loadSessionList();
+}
+
+function hideSessionModal() {
+  document.getElementById("sessionModal").style.display = "none";
+}
+
+async function loadSessionList() {
+  const list = document.getElementById("sessionsList");
+  list.innerHTML = '<div class="empty-state" style="display:flex;flex-direction:column;align-items:center;gap:8px;"><span style="font-size:18px;">⏳</span><span>Carregando sessões...</span></div>';
+  
+  // Timeout controller - Railway can be slow on cold start
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  
+  try {
+    const r = await fetch("/api/sessions", { signal: controller.signal });
+    clearTimeout(timeout);
+    const data = await r.json();
+
+    // DB still connecting — auto retry after 3s
+    if (data.retry) {
+      list.innerHTML = '<div class="empty-state" style="text-align:center;"><span style="font-size:16px;">🔄</span><br><span style="color:var(--muted);font-size:12px;">Conectando ao banco de dados...<br>aguarde um momento</span></div>';
+      setTimeout(() => loadSessionList(), 3000);
+      return;
+    }
+    
+    if (!data.sessions || data.sessions.length === 0) {
+      list.innerHTML = '<div class="empty-state" style="text-align:center;color:var(--muted);font-size:12px;">Nenhuma sessão encontrada.<br>Crie a primeira sessão acima.</div>';
+      return;
+    }
+    
+    list.innerHTML = "";
+    data.sessions.sort((a, b) => b.updatedAt - a.updatedAt).forEach(s => {
+      const item = document.createElement("div");
+      item.className = "session-row";
+      const msgs = s.messageCount || 0;
+      item.innerHTML = `
+        <div class="session-item-info">
+          <div class="session-row-name">${s.clientName}</div>
+          <div class="session-row-meta">${s.code} · ${msgs} msg${msgs!==1?'s':''} · ${formatDate(s.updatedAt)}</div>
+        </div>
+        <div class="session-item-code" style="color:var(--accent);font-size:11px;font-weight:600;">Abrir →</div>
+      `;
+      item.onclick = () => loadSession(s.id);
+      list.appendChild(item);
+    });
+  } catch(e) {
+    clearTimeout(timeout);
+    const isTimeout = e.name === 'AbortError';
+    list.innerHTML = `
+      <div class="empty-state" style="text-align:center;">
+        <div style="color:var(--danger);margin-bottom:8px;">${isTimeout ? '⏱ Conexão lenta — servidor iniciando...' : '⚠️ Erro ao carregar sessões.'}</div>
+        <button onclick="loadSessionList()" style="background:var(--surface2);border:1px solid var(--border);color:var(--accent);padding:6px 14px;border-radius:8px;font-size:12px;cursor:pointer;">↺ Tentar novamente</button>
+      </div>`;
+  }
+}
+
+function formatDate(ts) {
+  if (!ts) return "—";
+  const d = new Date(ts);
+  return d.toLocaleDateString("pt-BR") + " " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+
+async function createSession() {
+  const name = document.getElementById("clientName").value.trim();
+  const errEl = document.getElementById("newSessionError");
+  if (!name) { errEl.textContent = "Informe o nome do cliente."; return; }
+  errEl.textContent = "";
+
+  try {
+    const r = await fetch("/api/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientName: name })
+    });
+    const data = await r.json();
+    if (data.error) { errEl.textContent = data.error; return; }
+    await loadSession(data.id, true);
+  } catch(e) {
+    errEl.textContent = "Erro ao criar sessão.";
+  }
+}
+
+async function loadSession(sessionId, isNew = false) {
+  hideSessionModal();
+  currentSessionId = sessionId;
+  chat.innerHTML = "";
+  updateSteps(1);
+  sessionFileContents = []; // reset file contents for new session
+
+  try {
+    const r = await fetch(`/api/sessions/${sessionId}`);
+    const data = await r.json();
+
+    // Update session bar
+    document.getElementById("sessionCode").textContent = data.code;
+    document.getElementById("sessionName").textContent = data.clientName;
+    document.getElementById("sessionBar").style.display = "flex";
+  // Update sidebar session pill
+  const sn = document.getElementById("sessionName");
+  const sc = document.getElementById("sessionCode");
+  const sd = document.getElementById("sessionDot");
+  if (sn) sn.textContent = session.clientName || "Sessão ativa";
+  if (sc) sc.textContent = session.code || "";
+  if (sd) { sd.classList.remove("idle"); }
+  const topTitle = document.getElementById("topbarTitle");
+  if (topTitle) topTitle.textContent = session.clientName || "";
+
+    if (data.messages && data.messages.length > 0) {
+      // Restore existing conversation
+      data.messages.forEach(m => {
+        addMessage(m.role === "assistant" ? "ai" : "user", m.displayContent || m.content, m.imgSrc, false);
+      });
+
+      // Restore step
+      const lastAI = [...data.messages].reverse().find(m => m.role === "assistant");
+      if (lastAI) {
+        const lr = (lastAI.content || "").toLowerCase();
+        if (lr.includes("roadmap") || lr.includes("próximos passos")) updateSteps(5);
+        else if (lr.includes("as-is") || lr.includes("situação atual")) updateSteps(4);
+        else if (lr.includes("step") || lr.includes("processo é")) updateSteps(3);
+        else if (lr.includes("como o processo") || lr.includes("qual o volume")) updateSteps(2);
+      }
+    } else if (isNew) {
+      // New session — get greeting
+      await getGreeting();
+    }
+  } catch(e) {
+    addMessage("ai", "Erro ao carregar sessão. Tente novamente.", null, false);
+  }
+
+  inputBox.focus();
+}
+
+async function getGreeting() {
+  isLoading = true; sendBtn.disabled = true; showThinking();
+  try {
+    const r = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: currentSessionId,
+        max_tokens: 400,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: "Inicie a sessão de diagnóstico." }
+        ]
+      })
+    });
+    const data = await r.json();
+    removeThinking();
+    if (!data.error) {
+      const reply = data.choices[0].message.content;
+      addMessage("ai", reply, null, false); // already saved by server
+    }
+  } catch(e) {
+    removeThinking();
+    addMessage("ai", "Olá! Sou o consultor de IA da **Colink**. Qual empresa e setor você representa?", null, false);
+  }
+  isLoading = false; sendBtn.disabled = false;
+}
+
+function confirmNewSession() {
+  showSessionModal();
+  document.getElementById("clientName").focus();
+}
+
+// ── FILE HANDLING ─────────────────────────────────────────────────────────────
+const FILE_ICONS = { image:"🖼️", excel:"📊", pdf:"📄", word:"📝", text:"📋", unknown:"📎" };
+
+function getFileCategory(name) {
+  const ext = name.split(".").pop().toLowerCase();
+  if (["jpg","jpeg","png","gif","webp"].includes(ext)) return "image";
+  if (["xlsx","xls","csv"].includes(ext)) return "excel";
+  if (ext === "pdf") return "pdf";
+  if (["docx","doc"].includes(ext)) return "word";
+  if (ext === "txt") return "text";
+  return "unknown";
+}
+
+function formatBytes(b) {
+  if (b < 1024) return b + " B";
+  if (b < 1048576) return (b/1024).toFixed(1) + " KB";
+  return (b/1048576).toFixed(1) + " MB";
+}
+
+async function handleFileSelect(input) {
+  const files = Array.from(input.files);
+  if (!files.length) return;
+  input.value = "";
+
+  for (const file of files) {
+    const category = getFileCategory(file.name);
+    let fileObj;
+    if (category === "image") {
+      const b64 = await readAsBase64(file);
+      fileObj = { type: "image", category, name: file.name, size: file.size, data: b64, mimeType: file.type };
+    } else if (category === "excel") {
+      const text = await readExcelAsText(file);
+      fileObj = { type: "text_file", category, name: file.name, size: file.size, data: text };
+    } else {
+      const b64 = await readAsBase64(file);
+      fileObj = { type: "server_extract", category, name: file.name, size: file.size, data: b64, mimeType: file.type };
+    }
+    pendingFiles.push(fileObj);
+  }
+  showPendingAttachment();
+}
+
+function readAsBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = () => rej(new Error("Erro ao ler arquivo"));
+    r.readAsDataURL(file);
+  });
+}
+
+async function readExcelAsText(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = (e) => {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type:"array", cellFormula:true });
+        let out = `=== EXCEL: ${file.name} ===\nAbas: ${wb.SheetNames.join(", ")}\n\n`;
+        wb.SheetNames.forEach(name => {
+          const ws = wb.Sheets[name];
+          const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
+          out += `--- ABA: ${name} (${range.e.r+1} linhas x ${range.e.c+1} colunas) ---\n`;
+          out += "DADOS:\n" + XLSX.utils.sheet_to_csv(ws, { blankrows:false }) + "\n\n";
+          const formulas = [];
+          Object.keys(ws).forEach(cell => { if (!cell.startsWith("!") && ws[cell].f) formulas.push(`${cell}: =${ws[cell].f}`); });
+          if (formulas.length) out += `FÓRMULAS (${formulas.length}):\n` + formulas.join("\n") + "\n\n";
+        });
+        res(out);
+      } catch(err) { rej(err); }
+    };
+    r.onerror = () => rej(new Error("Erro ao ler Excel"));
+    r.readAsArrayBuffer(file);
+  });
+}
+
+function showPendingAttachment() {
+  const c = document.getElementById("pendingChips");
+  if (!c) return;
+  if (!pendingFiles.length) { c.style.display = "none"; c.innerHTML = ""; return; }
+  c.style.display = "flex";
+  c.innerHTML = pendingFiles.map((f,i) => `
+    <div class="file-chip" data-idx="${i}">
+      <span class="chip-icon">${FILE_ICONS[f.category] || '📎'}</span>
+      <span>${f.name.slice(0,24)}${f.name.length>24?'…':''}</span>
+      <span class="chip-remove" onclick="removeFile(${i})">✕</span>
+    </div>
+  `).join("");
+}
+
+function removeFile(index) {
+  pendingFiles.splice(index, 1);
+  showPendingAttachment();
+}
+
+function clearPendingAttachment() {
+  pendingFiles = [];
+  const c = document.getElementById("pendingChips");
+  c.style.display = "none"; c.innerHTML = "";
+}
+
+function readAsBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = () => rej(new Error("Erro ao ler arquivo"));
+    r.readAsDataURL(file);
+  });
+}
+
+async function readExcelAsText(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = (e) => {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type:"array", cellFormula:true });
+        let out = `=== EXCEL: ${file.name} ===\nAbas: ${wb.SheetNames.join(", ")}\n\n`;
+        wb.SheetNames.forEach(name => {
+          const ws = wb.Sheets[name];
+          const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
+          out += `--- ABA: ${name} (${range.e.r+1} linhas x ${range.e.c+1} colunas) ---\n`;
+          out += "DADOS:\n" + XLSX.utils.sheet_to_csv(ws, { blankrows:false }) + "\n\n";
+          const formulas = [];
+          Object.keys(ws).forEach(cell => { if (!cell.startsWith("!") && ws[cell].f) formulas.push(`${cell}: =${ws[cell].f}`); });
+          if (formulas.length) out += `FÓRMULAS (${formulas.length}):\n` + formulas.join("\n") + "\n\n";
+        });
+        res(out);
+      } catch(err) { rej(err); }
+    };
+    r.onerror = () => rej(new Error("Erro ao ler Excel"));
+    r.readAsArrayBuffer(file);
+  });
+}
+
+
+
+
+// ── SEND ──────────────────────────────────────────────────────────────────────
+
+// ── BUILD FULL CONVERSATION HISTORY ──────────────────────────────────────────
+function buildMessages(newUserContent) {
+  const msgs = [{ role: "system", content: SYSTEM_PROMPT }];
+  // Collect all messages from chat DOM
+  const chatMsgs = document.querySelectorAll('#chat .msg');
+  chatMsgs.forEach(m => {
+    const isUser = m.classList.contains('user');
+    const bubble = m.querySelector('.bubble');
+    if (!bubble) return;
+    const text = bubble.innerText || bubble.textContent || '';
+    if (text.trim()) {
+      msgs.push({ role: isUser ? 'user' : 'assistant', content: text.trim() });
+    }
+  });
+  // Add the new user message (not yet in DOM)
+  msgs.push({ role: 'user', content: newUserContent });
+  // Keep max 40 messages to avoid token limit (system + last 39)
+  if (msgs.length > 41) {
+    const system = msgs[0];
+    const recent = msgs.slice(-(40));
+    return [system, ...recent];
+  }
+  return msgs;
+}
+
+async function send() {
+  const text = inputBox.value.trim();
+  if ((!text && !pendingFiles.length) || isLoading || !currentSessionId) return;
+
+  inputBox.value = ""; inputBox.style.height = "auto";
+  isLoading = true; sendBtn.disabled = true;
+
+  const files = [...pendingFiles];
+  clearPendingAttachment();
+
+  // Show user messages in chat
+  if (files.length > 0) {
+    const fileChips = files.map(f => {
+      const icons = {image:"🖼️", excel:"📊", pdf:"📄", word:"📝", text:"📋", document:"📄"};
+      const icon = icons[f.category] || "📎";
+      return icon + " **" + f.name + "**";
+    }).join("\n");
+    addMessage("user", (text ? text + "\n\n" : "") + fileChips, null, false);
+  } else {
+    addMessage("user", text, null, false);
+  }
+
+  // Build content for API — process all files
+  let userMsgContent = "";
+  let displayContent = text || "";
+
+  if (files.length > 0) {
+    showThinking();
+    let filesText = text ? text + "\n\n" : "";
+    const fileList = files.map(f => f.name).join(", ");
+    filesText += `[ARQUIVOS RECEBIDOS: ${fileList}]\n`;
+    filesText += `O usuário enviou ${files.length} arquivo(s) para análise. Analise PROFUNDAMENTE cada um, extraia métricas, números, padrões e problemas, e faça perguntas específicas baseadas nos dados reais encontrados.\n\n`;
+
+    for (const file of files) {
+      if (file.type === "image") {
+        filesText += `[IMAGEM: ${file.name}] — Arquivo de imagem enviado para análise visual.\n`;
+        sessionFileContents.push({ name: file.name, type: 'image', content: '[Imagem enviada para análise]' });
+      } else if (file.type === "text_file") {
+        filesText += file.data + "\n\n";
+        sessionFileContents.push({ name: file.name, type: 'excel', content: file.data.slice(0, 8000) });
+      } else if (file.type === "server_extract") {
+        try {
+          const resp = await fetch("/api/extract", {
+            method:"POST", headers:{"Content-Type":"application/json"},
+            body: JSON.stringify({ name:file.name, data:file.data, mimeType:file.mimeType })
+          });
+          const result = await resp.json();
+          filesText += result.text + "\n\n";
+          sessionFileContents.push({ name: file.name, type: 'document', content: result.text.slice(0, 10000) });
+        } catch(e) {
+          filesText += `[Erro ao extrair ${file.name}]\n`;
+        }
+      }
+    }
+    removeThinking();
+
+    // If single image, use vision
+    if (files.length === 1 && files[0].type === "image") {
+      const b64 = files[0].data.split(",")[1];
+      userMsgContent = [
+        { type:"image_url", image_url:{ url:`data:${files[0].mimeType};base64,${b64}`, detail:"high" } },
+        { type:"text", text: text || "Analise esta imagem no contexto do diagnóstico de processos." }
+      ];
+    } else {
+      userMsgContent = filesText;
+    }
+
+    displayContent = (text ? text + " — " : "") + files.map(f=>f.name).join(", ");
+  } else {
+    userMsgContent = text;
+    displayContent = text;
+  }
+
+  showThinking();
+
+  try {
+    const r = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: currentSessionId,
+        max_tokens: 2500,
+        userDisplayContent: displayContent,
+        messages: buildMessages(userMsgContent)
+      })
+    });
+    const data = await r.json();
+    removeThinking();
+
+    if (data.error) {
+      const e = document.createElement("div"); e.className = "error-bubble";
+      e.textContent = "Erro: " + data.error.message; chat.appendChild(e);
+    } else {
+      const reply = data.choices[0].message.content;
+      addMessage("ai", reply, null, false);
+      const lr = reply.toLowerCase();
+      // Update progress bar
+      if (lr.includes("roadmap") || lr.includes("próximos passos") || lr.includes("step 10") || lr.includes("diagnóstico completo")) updateSteps(5);
+      else if (lr.includes("as-is") || lr.includes("situação atual") || lr.includes("step 9") || lr.includes("step 8")) updateSteps(4);
+      else if (lr.includes("step 7") || lr.includes("step 6") || lr.includes("step 5") || lr.includes("gargalo")) updateSteps(3);
+      else if (lr.includes("step 4") || lr.includes("step 3") || lr.includes("step 2") || lr.includes("como o processo")) updateSteps(2);
+      // Detect diagnosis complete — show CTA banner
+      const isDiagnosisComplete = (
+        lr.includes("diagnóstico completo") ||
+        (lr.includes("as-is") && lr.includes("to-be") && lr.includes("roadmap")) ||
+        (lr.includes("próximos passos") && lr.includes("oportunidades") && lr.includes("roadmap")) ||
+        (lr.includes("impacto financeiro") && lr.includes("roadmap"))
+      );
+      if (isDiagnosisComplete) {
+        updateSteps(5);
+        setTimeout(() => {
+          const banner = document.createElement("div");
+          banner.style.cssText = "background:linear-gradient(135deg,rgba(232,200,114,0.15),rgba(26,115,232,0.1));border:1px solid rgba(232,200,114,0.4);border-radius:12px;padding:16px 20px;margin:12px 0;display:flex;align-items:center;justify-content:space-between;gap:12px;";
+          banner.innerHTML = '<div><div style="font-weight:600;color:#e8c872;font-size:13px;margin-bottom:3px;">&#x2705; Diagnóstico concluído!</div><div style="font-size:12px;color:#9aa3b2;">Clique em Relatórios para baixar PDF, PPTX, Excel, Infográfico e mais.</div></div><button onclick="openReports()" style="background:#e8c872;color:#0d0e11;border:none;border-radius:8px;padding:9px 18px;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;">&#x1F4C4; Gerar Relatórios</button>';
+          chat.appendChild(banner);
+          chat.scrollTop = chat.scrollHeight;
+        }, 800);
+      }
+    }
+  } catch(err) {
+    removeThinking();
+    const e = document.createElement("div"); e.className = "error-bubble";
+    e.textContent = "Falha na conexão. Tente novamente."; chat.appendChild(e);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  isLoading = false; sendBtn.disabled = false; inputBox.focus();
+}
+
+// ── INPUT EVENTS ───────────────────────────────────────────────────────────────
+inputBox.addEventListener("input", () => {
+  inputBox.style.height = "auto";
+  inputBox.style.height = Math.min(inputBox.scrollHeight, 130) + "px";
+});
+inputBox.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+});
+
+document.addEventListener("dragover", e => e.preventDefault());
+document.addEventListener("drop", e => {
+  e.preventDefault();
+  const files = e.dataTransfer.files;
+  if (files.length) handleFileSelect({ files, value:"" });
+});
+
+// ── INIT ───────────────────────────────────────────────────────────────────────
+
+// ── REPORTS ───────────────────────────────────────────────────────────────────
+function openReports() {
+  if (!currentSessionId) { alert('Nenhuma sessão ativa.'); return; }
+  // Save conversation and files to localStorage for reports page
+  const conversation = buildConversationSummary();
+  localStorage.setItem('colink_conversation', conversation);
+  localStorage.setItem('colink_files', JSON.stringify(sessionFileContents || []));
+  localStorage.setItem('colink_session_id', currentSessionId);
+  const name = document.getElementById('sessionName');
+  const code = document.getElementById('sessionCode');
+  localStorage.setItem('colink_session_name', name ? name.textContent : '');
+  localStorage.setItem('colink_session_code', code ? code.textContent : '');
+  // Open reports page in new tab
+  const params = new URLSearchParams({
+    session: currentSessionId,
+    name: name ? name.textContent : '',
+    code: code ? code.textContent : ''
+  });
+  window.open('/relatorios.html?' + params.toString(), '_blank');
+}
+
+function openReports() {
+  const modal = document.getElementById('reportsModal');
+  modal.style.display = 'flex';
+  const grid  = document.getElementById('reportsGrid');
+  const noSes = document.getElementById('reportsNoSession');
+  const sub   = document.getElementById('reportsSub');
+  if (!currentSessionId) {
+    grid.style.display  = 'none';
+    noSes.style.display = 'block';
+  } else {
+    grid.style.display  = 'grid';
+    noSes.style.display = 'none';
+    const name = document.getElementById('sessionName');
+    const code = document.getElementById('sessionCode');
+    sub.textContent = 'Conversa atual · ' + (name ? name.textContent : '') + ' ' + (code ? code.textContent : '');
+  }
+  modal.style.display = 'flex';
+}
+
+function hideReportsModal() {
+  document.getElementById('reportsModal').style.display = 'none';
+}
+
+function buildConversationSummary() {
+  const msgs = document.querySelectorAll('#chat .msg');
+  let summary = '';
+  msgs.forEach(m => {
+    const role = m.classList.contains('user') ? 'Consultor' : 'IA Colink';
+    const text = (m.querySelector('.bubble') || {}).innerText || '';
+    if (text.trim()) summary += role + ': ' + text.trim() + '\n\n';
+  });
+
+  // Append all uploaded file contents
+  if (sessionFileContents.length > 0) {
+    summary += '\n\n=== ARQUIVOS ENVIADOS PELO CLIENTE (' + sessionFileContents.length + ' arquivo(s)) ===\n';
+    sessionFileContents.forEach(f => {
+      summary += '\n--- ARQUIVO: ' + f.name + ' ---\n' + f.content + '\n';
+    });
+  }
+
+  return summary.slice(0, 28000); // increased limit to fit files
+}
+
+async function callAIForReport(systemPrompt, userPrompt) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 140000); // 140s timeout
+  try {
+    const r = await fetch('/api/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        type: 'report',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user',   content: userPrompt   }
+        ]
+      })
+    });
+    clearTimeout(timeout);
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.error?.message || 'Erro HTTP ' + r.status);
+    }
+    const data = await r.json();
+    if (data.error) throw new Error(data.error.message || 'Erro da API');
+    return data.choices[0].message.content;
+  } catch(e) {
+    clearTimeout(timeout);
+    if (e.name === 'AbortError') throw new Error('Timeout após 140s. Tente novamente ou use uma sessão com menos mensagens.');
+    throw e;
+  }
+}
+
+function downloadBlob(content, filename, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 100);
+}
+
+// Progress messages per report type
+const PROGRESS_MSGS = {
+  pdf:         ['Lendo conversa...', 'Analisando 10 Steps...', 'Montando AS-IS / TO-BE...', 'Adicionando benchmarks...', 'Calculando ROI...', 'Finalizando relatório...'],
+  pptx:        ['Lendo diagnóstico...', 'Criando estrutura de slides...', 'Adicionando dados reais...', 'Montando benchmark...', 'Finalizando apresentação...'],
+  excel:       ['Analisando oportunidades...', 'Listando iniciativas...', 'Calculando prazos...', 'Finalizando planilha...'],
+  spec:        ['Mapeando processo...', 'Documentando regras de negócio...', 'Definindo fluxo TO-BE...', 'Detalhando integrações...', 'Finalizando spec...'],
+  infographic: ['Extraindo dados do diagnóstico...', 'Estruturando visual...', 'Gerando SVG...'],
+  mindmap:     ['Estruturando dimensões...', 'Conectando nós...', 'Finalizando mapa...'],
+  email:       ['Analisando contexto...', 'Redigindo email...', 'Revisando conteúdo...'],
+  bpmn:        ['Mapeando etapas AS-IS...', 'Identificando gargalos...', 'Desenhando TO-BE...', 'Adicionando swimlanes...', 'Finalizando BPMN...'],
+  decision:    ['Extraindo perguntas-chave...', 'Mapeando critérios...', 'Construindo árvore...', 'Adicionando probabilidades...', 'Finalizando fluxograma...'],
+  tree:        ['Analisando objetivo central...', 'Desdobrando tarefas...', 'Hierarquizando ações...', 'Conectando dependências...', 'Finalizando diagrama...'],
+  scenarios:   ['Identificando variáveis...', 'Calculando probabilidades...', 'Montando cenários...', 'Calculando custos e riscos...', 'Finalizando mapa de cenários...'],
+};
+
+const progressTimers = {};
+
+function setCardGenerating(id, generating) {
+  const card = document.getElementById('card-' + id);
+  if (!card) return;
+  const progress = card.querySelector('.rprogress');
+  const done     = card.querySelector('.rdone');
+  const bar      = card.querySelector('.rbar');
+  const status   = card.querySelector('.rstatus');
+
+  if (generating) {
+    card.classList.add('generating');
+    card.classList.remove('done');
+    if (progress) progress.style.display = 'block';
+    if (done)     done.style.display     = 'none';
+
+    // Animate progress bar
+    let pct = 0;
+    let msgIdx = 0;
+    const msgs = PROGRESS_MSGS[id] || ['Gerando...'];
+    if (status) status.textContent = msgs[0];
+
+    progressTimers[id] = setInterval(() => {
+      // Non-linear progress — slows near 90%
+      if (pct < 30)       pct += 8;
+      else if (pct < 60)  pct += 5;
+      else if (pct < 80)  pct += 2;
+      else if (pct < 90)  pct += 0.5;
+      // else wait for done
+
+      if (bar) bar.style.width = Math.min(pct, 90) + '%';
+
+      // Cycle through status messages
+      const expectedMsg = Math.floor(pct / (90 / msgs.length));
+      if (expectedMsg > msgIdx && expectedMsg < msgs.length) {
+        msgIdx = expectedMsg;
+        if (status) status.textContent = msgs[msgIdx];
+      }
+    }, 600);
+
+  } else {
+    // Done!
+    clearInterval(progressTimers[id]);
+    card.classList.remove('generating');
+    card.classList.add('done');
+    if (bar)    { bar.style.width = '100%'; bar.style.background = '#5fcb8e'; }
+    if (status) status.textContent = 'Concluído!';
+    setTimeout(() => {
+      if (progress) progress.style.display = 'none';
+      if (done)     done.style.display     = 'block';
+      // Reset after 4s
+      setTimeout(() => {
+        card.classList.remove('done');
+        if (done) done.style.display = 'none';
+        if (bar)  { bar.style.width = '0%'; bar.style.background = ''; }
+      }, 4000);
+    }, 400);
+  }
+}
+
+const _reportLock = {};
+async function generateReport(type) {
+  if (!currentSessionId) return;
+  if (_reportLock[type]) return; // prevent double execution
+  _reportLock[type] = true;
+  setCardGenerating(type, true);
+
+  const conversation = buildConversationSummary();
+  const sessionName  = (document.getElementById('sessionName') || {}).textContent || 'Cliente';
+  const sessionCode  = (document.getElementById('sessionCode') || {}).textContent || '';
+  const today        = new Date().toLocaleDateString('pt-BR');
+
+  // Premium system prompt for all reports
+  const REPORT_SYSTEM = `Você é um consultor sênior da Colink Business Consulting.
+Gere relatórios DETALHADOS, COMPLETOS e IMPRESSIONANTES para apresentação executiva ao cliente.
+REGRAS:
+- Use dados reais extraídos da conversa
+- Inclua SEMPRE: métricas quantitativas, benchmarks de mercado, matriz de risco, análise financeira detalhada
+- Seja específico: cite ferramentas, responsáveis, prazos reais
+- Formato profissional em português do Brasil
+- Mínimo de conteúdo: seja EXTENSO e DETALHADO`;
+
+  try {
+
+    // ── PDF / RELATÓRIO EXECUTIVO ──────────────────────────────────────────────
+    if (type === 'pdf') {
+      const md = await callAIForReport(REPORT_SYSTEM,
+        `GERE UM RELATÓRIO EXECUTIVO HTML COMPLETO para ${sessionName} ${sessionCode}.
+DATA: ${today}
+DADOS (conversa + arquivos): ${conversation}
+
+HTML com CSS inline. Seções OBRIGATÓRIAS:
+<div class="header"><h1>Relatório Diagnóstico</h1><p>${sessionName} ${sessionCode} · ${today} · Colink</p></div>
+
+## 1. RESUMO EXECUTIVO
+Contexto empresa, escopo diagnóstico, metodologia Colink 10 Steps, 4 achados principais.
+
+## 2. KPIs ATUAIS (cards HTML)
+Mostre: conversão atual, leads/mês, clientes/mês, ticket médio — com valores REAIS da conversa.
+
+## 3. DIAGNÓSTICO 10 STEPS
+Tabela: Step | Pergunta | Resultado | Ação Necessária
+
+## 4. NÍVEL DE MATURIDADE: [0-5 NOME]
+Justificativa com 3 parágrafos. O que isso significa para a empresa.
+
+## 5. AS-IS — SITUAÇÃO ATUAL
+Tabela: # | Etapa | Responsável | Ferramenta | Problema Identificado | Impacto
+
+## 6. GARGALOS CRÍTICOS
+Tabela: Gargalo | Causa Raiz | Frequência | Impacto Estimado | Urgência
+
+## 7. TO-BE — COM IA
+Tabela: Etapa | Responsável | Ferramenta/IA | Tipo (RPA/Agente) | SLA | Benefício
+
+## 8. OPORTUNIDADES DE IA
+Tabela: Oportunidade | Tipo | Impacto | Esforço | Quick Win? | Fase
+
+## 9. BENCHMARK DE MERCADO
+OBRIGATÓRIO: compare métricas da empresa com benchmarks reais do setor:
+Tabela: Métrica | Empresa Atual | Benchmark Setor | Meta 6 Meses
+Inclua: taxa de conversão (setor SaaS B2B: 15-25%), tempo 1o contato (<2h padrão mercado), adoção CRM (média 73%), ciclo de vendas médio, etc.
+
+## 10. MATRIZ DE RISCO
+Tabela: Risco | Probabilidade (A/M/B) | Impacto (A/M/B) | Score | Plano de Mitigação
+Mínimo 6 riscos reais do projeto.
+
+## 11. IMPACTO FINANCEIRO
+Tabela: Indicador | Situação Atual | Projeção 12m | Variação
+Calcule ROI, payback, receita incremental com valores REAIS da conversa.
+
+## 12. ROADMAP
+3 fases (0-3m Estruturar / 3-6m Digitalizar / 6-12m IA) com tabela por fase.
+
+## 13. PRÓXIMOS 5 PASSOS
+Lista numerada com owner e prazo específico.
+
+CSS: body{font-family:Calibri,sans-serif;max-width:900px;margin:40px auto;padding:0 28px;color:#1a1a2e;line-height:1.7}
+.header{background:#0F1B35;padding:28px;margin:0 -28px 32px;border-left:6px solid #E8C872}
+.header h1{color:#E8C872;font-size:26px;border:none;margin-bottom:4px}
+.header p{color:#9AA3B2;font-size:13px}
+h2{color:#0F1B35;font-size:16px;border-left:4px solid #E8C872;padding-left:10px;margin:28px 0 10px}
+table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13px}
+th{background:#0F1B35;color:white;padding:8px 12px;text-align:left;font-size:11px}
+td{padding:8px 12px;border-bottom:1px solid #e8ecf4}
+tr:nth-child(even) td{background:#f8f9ff}
+.kpis{display:flex;gap:12px;margin:16px 0}
+.kpi{flex:1;background:#f0f4ff;border-radius:8px;padding:14px;text-align:center;border-top:3px solid #1A73E8}
+.kpi b{font-size:24px;display:block;color:#0F1B35}
+.kpi span{font-size:11px;color:#7a7f8e}
+.risk-a{background:#fef2f2;color:#c0392b;font-weight:bold}
+.risk-m{background:#fffbeb;color:#856404}
+.risk-b{background:#edfaf1;color:#2E7D52}
+footer{font-size:11px;color:#7a7f8e;text-align:center;margin-top:24px;padding-top:12px;border-top:1px solid #e2e8f0}`
+      )
+      downloadBlob(md, 'relatorio-' + sessionName + '-' + sessionCode + '.html', 'text/html');
+
+    // ── EXCEL / PLANO DE AÇÃO ─────────────────────────────────────────────────
+    } else if (type === 'excel') {
+      const csv = await callAIForReport(REPORT_SYSTEM,
+        `Com base no diagnóstico COMPLETO e nos arquivos enviados, gere um PLANO DE AÇÃO DETALHADO em CSV.
+
+EMPRESA: ${sessionName} | DATA: ${today}
+DADOS COMPLETOS (inclui arquivos enviados): ${conversation}
+
+INSTRUÇÕES CRÍTICAS:
+- Use dados REAIS da conversa e dos arquivos enviados
+- Mencione ferramentas reais (HubSpot, WhatsApp, Excel, Word, etc.)
+- Cite problemas específicos identificados (duplicatas, follow-up, etc.)
+- Mínimo 16 iniciativas específicas, práticas e acionáveis
+
+CABEÇALHO OBRIGATÓRIO (use ponto-e-vírgula):
+#;Iniciativa;Processo Impactado;Tipo;Prazo;Impacto;Esforço;Responsável;Status;Observação
+
+Tipos: Melhoria de Processo / Digitalização / RPA / Agente IA / Integração / Capacitação / Quick Win
+Prazos: 0-3m / 3-6m / 6-12m
+Impacto/Esforço: Alto / Médio / Baixo
+
+Retorne APENAS o CSV puro, primeira linha é o cabeçalho, sem markdown, sem blocos de código.`
+      );
+      downloadBlob('\uFEFF' + csv, 'plano-acao-' + sessionName + '.csv', 'text/csv;charset=utf-8');
+
+    } else if (type === 'spec') {
+      const spec = await callAIForReport(REPORT_SYSTEM,
+        `Com base no diagnóstico, gere uma ESPECIFICAÇÃO FUNCIONAL COMPLETA em HTML.
+
+EMPRESA: ${sessionName} | DATA: ${today}
+CONVERSA: ${conversation}
+
+Seções obrigatórias:
+1. OBJETIVO DO DOCUMENTO
+2. ESCOPO (inclui / não inclui)
+3. ATORES E RESPONSABILIDADES (tabela: Ator | Papel | Responsabilidade | SLA)
+4. FLUXO TO-BE DETALHADO (passo a passo numerado com: Etapa | Trigger | Responsável | Sistema | Output | SLA)
+5. REGRAS DE NEGÓCIO (mínimo 10 regras numeradas RN01..RN10)
+6. ENTRADAS E SAÍDAS (tabela: Tipo | Item | Formato | Origem | Destino)
+7. EXCEÇÕES E TRATAMENTOS (tabela: Situação | Causa | Tratamento | Responsável)
+8. INTEGRAÇÕES COM SISTEMAS (tabela: Sistema | Tipo | Dados | Frequência | Responsável)
+9. REQUISITOS NÃO FUNCIONAIS (performance, disponibilidade, segurança, LGPD)
+10. CRITÉRIOS DE ACEITE (lista de critérios mensuráveis)
+11. GLOSSÁRIO
+
+Use CSS: body{font-family:Calibri,sans-serif;max-width:900px;margin:40px auto;padding:0 28px;color:#1a1a2e;line-height:1.7;}
+h1{color:#0F1B35;font-size:22px;border-bottom:3px solid #1A73E8;padding-bottom:8px;}
+h2{font-size:15px;color:white;background:#0F1B35;padding:8px 14px;border-left:4px solid #1A73E8;margin:24px 0 10px;}
+table{border-collapse:collapse;width:100%;font-size:13px;margin:12px 0;}
+th{background:#0F1B35;color:white;padding:8px 10px;text-align:left;font-size:11px;}
+td{padding:8px 10px;border:1px solid #e2e8f0;}
+tr:nth-child(even) td{background:#f8f9ff;}
+.rule{background:#fffbeb;border-left:3px solid #E8C872;padding:8px 12px;margin:5px 0;border-radius:0 6px 6px 0;}
+footer{font-size:11px;color:#7a7f8e;text-align:center;margin-top:28px;padding-top:12px;border-top:1px solid #e2e8f0;}`
+      );
+      downloadBlob(spec, 'especificacao-' + sessionName + '.html', 'text/html');
+
+    // ── INFOGRÁFICO ───────────────────────────────────────────────────────────
+    } else if (type === 'infographic') {
+      const raw = await callAIForReport(REPORT_SYSTEM,
+        `Extraia os dados do diagnóstico e retorne APENAS JSON válido (sem markdown, sem explicação):
+{"cliente":"nome completo","processo":"nome do processo","nivel":0,"nivel_label":"CAÓTICO",
+"steps_ok":[4,6,7],"steps_nok":[1,2,3,5,9,10],
+"gargalos":["descrição gargalo 1","descrição gargalo 2","descrição gargalo 3"],
+"oportunidades":[{"tipo":"RPA","desc":"descrição específica"},{"tipo":"Agente IA","desc":"descrição específica"},{"tipo":"RPA","desc":"descrição"},{"tipo":"Agente IA","desc":"descrição"}],
+"quick_wins":["ação específica 1","ação específica 2","ação específica 3"],
+"conversao_atual":"8%","conversao_meta":"15%","roi":"R$ 230.400"}
+
+CONVERSA: ${conversation}`
+      );
+      let d;
+      try { d = JSON.parse(raw.replace(/```json|```/g,'').trim()); }
+      catch(e) { d = {cliente:sessionName,processo:'Processo',nivel:0,nivel_label:'CAÓTICO',steps_ok:[4,6,7],steps_nok:[1,2,3,5,9,10],gargalos:['Identificar gargalos','Padronizar processo','Formalizar SLAs'],oportunidades:[{tipo:'RPA',desc:'Automação de cadastros'},{tipo:'Agente IA',desc:'Qualificação de leads'},{tipo:'RPA',desc:'Follow-up automático'},{tipo:'Agente IA',desc:'Proposta automatizada'}],quick_wins:['Mapear processo real','Template de proposta','Configurar SLA no CRM'],conversao_atual:'8%',conversao_meta:'15%',roi:'R$ 230.400'}; }
+      downloadBlob(generateInfographic(d, today), 'infografico-' + sessionName + '.svg', 'image/svg+xml');
+
+    // ── MAPA MENTAL ───────────────────────────────────────────────────────────
+    } else if (type === 'mindmap') {
+      const raw = await callAIForReport(REPORT_SYSTEM,
+        `Extraia os dados do diagnóstico e retorne APENAS JSON válido:
+{"centro":"Nome do Processo","ramos":[
+{"label":"Situação Atual","cor":"#1A73E8","filhos":["etapa1 real","etapa2 real","etapa3 real","etapa4 real"]},
+{"label":"Gargalos","cor":"#ff6b6b","filhos":["gargalo1 real","gargalo2 real","gargalo3 real"]},
+{"label":"Oportunidades IA","cor":"#5fcb8e","filhos":["oportunidade1","oportunidade2","oportunidade3"]},
+{"label":"TO-BE","cor":"#e8c872","filhos":["melhoria1","melhoria2","melhoria3"]},
+{"label":"Roadmap","cor":"#a78bfa","filhos":["0-3m: ação específica","3-6m: ação específica","6-12m: ação específica"]},
+{"label":"Impacto","cor":"#f97316","filhos":["métrica1","métrica2","ROI estimado"]}
+]}
+CONVERSA: ${conversation}`
+      );
+      let d;
+      try { d = JSON.parse(raw.replace(/```json|```/g,'').trim()); }
+      catch(e) { d = {centro:'Processo',ramos:[{label:'AS-IS',cor:'#1A73E8',filhos:['Etapa 1','Etapa 2']},{label:'Gargalos',cor:'#ff6b6b',filhos:['Gargalo 1']},{label:'TO-BE',cor:'#5fcb8e',filhos:['Melhoria 1']},{label:'Roadmap',cor:'#a78bfa',filhos:['0-3m','3-6m','6-12m']}]}; }
+      downloadBlob(generateMindMap(d, sessionName), 'mapa-mental-' + sessionName + '.html', 'text/html');
+
+    // ── APRESENTAÇÃO ──────────────────────────────────────────────────────────
+    } else if (type === 'pptx') {
+      const raw = await callAIForReport(REPORT_SYSTEM,
+        `Com base no diagnóstico, crie uma APRESENTAÇÃO EXECUTIVA COMPLETA. Retorne APENAS JSON:
+{"titulo":"Diagnóstico de Processos","cliente":"${sessionName}","slides":[
+{"titulo":"Capa","tipo":"cover","conteudo":"Diagnóstico Operacional com IA — Colink Business Consulting"},
+{"titulo":"Agenda","tipo":"bullets","conteudo":["Contexto e metodologia","Diagnóstico 10 Steps","Situação atual (AS-IS)","Oportunidades de IA","Roadmap e próximos passos","Impacto financeiro"]},
+{"titulo":"Resultado 10 Steps","tipo":"table","conteudo":[["Step","Resultado","Ação"],["1 - Processo mapeado","SIM/NÃO","ação real"],["2 - Processo estável","SIM/NÃO","ação real"],["3 - Dados íntegros","SIM/NÃO","ação real"],["4 - Gargalo identificado","SIM/NÃO","ação real"],["5 - Padrão definido","SIM/NÃO","ação real"]]},
+{"titulo":"Situação Atual — AS-IS","tipo":"bullets","conteudo":["etapa1 real do processo","etapa2 real","etapa3 real","etapa4 gargalo","etapa5 gargalo"]},
+{"titulo":"Gargalos Críticos","tipo":"bullets","conteudo":["gargalo1 com impacto","gargalo2 com impacto","gargalo3 com impacto"]},
+{"titulo":"Oportunidades de IA","tipo":"table","conteudo":[["Oportunidade","Tipo","Impacto","Esforço"],["oportunidade1","RPA/Agente","Alto","Baixo"],["oportunidade2","RPA/Agente","Alto","Médio"],["oportunidade3","RPA/Agente","Médio","Alto"]]},
+{"titulo":"Benchmark de Mercado","tipo":"table","conteudo":[["Métrica","Mercado","Empresa Atual","Meta"],["Taxa de conversão","12-18%","8%","15%"],["Tempo resp. lead","<2h","4-8h","<2h"],["Adoção CRM","75%","30%","90%"]]},
+{"titulo":"Matriz de Risco","tipo":"table","conteudo":[["Risco","Probabilidade","Impacto","Score"],["Resistência da equipe","Alta","Médio","Alto"],["Dados sujos no CRM","Alta","Alto","Crítico"],["Falta de governança","Média","Alto","Alto"]]},
+{"titulo":"Roadmap de Transformação","tipo":"bullets","conteudo":["0-3m (Estruturar): ações específicas reais","3-6m (Digitalizar): ações específicas reais","6-12m (Automatizar): ações específicas reais com IA"]},
+{"titulo":"Impacto Financeiro","tipo":"table","conteudo":[["Indicador","Atual","Projetado","Variação"],["Conversão","8%","15%","+87%"],["Clientes/mês","6","12","+6"],["Receita MRR","valor","valor","+R$ X.XXX"]]},
+{"titulo":"Próximos Passos","tipo":"bullets","conteudo":["1. ação imediata com owner e prazo","2. ação imediata","3. ação imediata","4. ação imediata","5. ação imediata"]}
+]}
+CONVERSA: ${conversation}`
+      );
+      let d;
+      try { d = JSON.parse(raw.replace(/```json|```/g,'').trim()); }
+      catch(e) { d = {titulo:'Diagnóstico',cliente:sessionName,slides:[{titulo:'Diagnóstico',tipo:'cover',conteudo:'Colink Business Consulting'}]}; }
+      downloadBlob(generatePPTPreview(d, today), 'apresentacao-' + sessionName + '.html', 'text/html');
+
+    // ── EMAIL ─────────────────────────────────────────────────────────────────
+    } else if (type === 'bpmn') {
+      const raw = await callAIForReport(REPORT_SYSTEM,
+        `Extraia dados do diagnóstico e retorne APENAS JSON válido (sem markdown):
+{
+  "processo": "nome do processo",
+  "cliente": "nome empresa",
+  "atores": ["SDR", "Closer", "Gestor Comercial", "Sistema/CRM"],
+  "asis": [
+    {"ator": "SDR", "etapa": "nome da etapa", "descricao": "o que acontece", "problema": true, "problema_desc": "qual problema"},
+    {"ator": "SDR", "etapa": "Qualificação BANT", "descricao": "Liga e qualifica sem roteiro", "problema": true, "problema_desc": "Sem padrão, anotado no caderno"},
+    {"ator": "Closer", "etapa": "Demo", "descricao": "Google Meet", "problema": false, "problema_desc": ""},
+    {"ator": "Closer", "etapa": "Proposta", "descricao": "Word sem template", "problema": true, "problema_desc": "Sem padrão, sem rastreamento"},
+    {"ator": "Sistema/CRM", "etapa": "Cadastro no HubSpot", "descricao": "Manual, sem validação", "problema": true, "problema_desc": "Gera duplicatas"}
+  ],
+  "tobe": [
+    {"ator": "Sistema/CRM", "etapa": "nome da etapa", "descricao": "como fica", "automacao": "RPA", "sla": "2h"},
+    {"ator": "SDR", "etapa": "Qualificação BANT", "descricao": "Formulário padronizado no CRM", "automacao": "", "sla": ""},
+    {"ator": "Sistema/CRM", "etapa": "Score automático", "descricao": "Score BANT ≥7 avança", "automacao": "RPA", "sla": "Automático"},
+    {"ator": "Closer", "etapa": "Demo", "descricao": "Agendamento automático Calendly", "automacao": "Integração", "sla": "24h"},
+    {"ator": "Agente IA", "etapa": "Proposta", "descricao": "Rascunho automático + revisão Closer", "automacao": "Agente IA", "sla": "2h pós-demo"}
+  ],
+  "gargalos": ["gargalo1 real", "gargalo2 real", "gargalo3 real"]
+}
+Preencha com dados REAIS do diagnóstico.
+CONVERSA: ${conversation}`
+      );
+      let bpmnData;
+      try { bpmnData = JSON.parse(raw.replace(/\`\`\`json|\`\`\`/g,'').trim()); }
+      catch(e) { bpmnData = null; }
+      downloadBlob(generateBPMN(bpmnData, sessionName, today), 'processo-' + sessionName + '.html', 'text/html');
+
+  } else if (type === 'decision') {
+      const raw = await callAIForReport(REPORT_SYSTEM,
+        `Com base no diagnóstico, crie uma ÁRVORE DE DECISÃO para o processo. Retorne APENAS JSON válido:
+{
+  "titulo": "Árvore de Decisão — nome do processo",
+  "descricao": "objetivo da árvore em 1 frase",
+  "raiz": {
+    "pergunta": "O processo está documentado e estável?",
+    "sim": {
+      "pergunta": "Os dados são íntegros e consistentes?",
+      "sim": {
+        "pergunta": "O gargalo principal está identificado?",
+        "sim": { "acao": "Partir para automação por RPA ou Agente IA", "tipo": "sucesso", "impacto": "Alto", "prazo": "3-6m" },
+        "nao": { "acao": "Mapear funil e identificar onde leads caem", "tipo": "acao", "impacto": "Alto", "prazo": "0-3m" }
+      },
+      "nao": {
+        "pergunta": "Há duplicatas ou inconsistências críticas?",
+        "sim": { "acao": "Limpar base CRM e padronizar campos obrigatórios", "tipo": "urgente", "impacto": "Alto", "prazo": "0-3m" },
+        "nao": { "acao": "Estabelecer processo de validação de dados", "tipo": "acao", "impacto": "Médio", "prazo": "0-3m" }
+      }
+    },
+    "nao": {
+      "pergunta": "Existe ao menos um POP rascunhado?",
+      "sim": {
+        "pergunta": "O time conhece e segue o POP?",
+        "sim": { "acao": "Formalizar, revisar e comunicar o POP oficial", "tipo": "acao", "impacto": "Alto", "prazo": "0-3m" },
+        "nao": { "acao": "Treinamento urgente + revisão do POP com o time", "tipo": "urgente", "impacto": "Alto", "prazo": "0-3m" }
+      },
+      "nao": { "acao": "Workshop de mapeamento do processo real — primeira prioridade", "tipo": "critico", "impacto": "Crítico", "prazo": "Imediato" }
+    }
+  }
+}
+Use dados REAIS do diagnóstico para personalizar perguntas e ações.
+CONVERSA: ${conversation}`
+      );
+      let decData;
+      try { decData = JSON.parse(raw.replace(/\`\`\`json|\`\`\`/g,'').trim()); }
+      catch(e) { decData = null; }
+      downloadBlob(generateDecisionTree(decData, sessionName, today), 'arvore-decisao-' + sessionName + '.html', 'text/html');
+
+  } else if (type === 'tree') {
+      const raw = await callAIForReport(REPORT_SYSTEM,
+        `Com base no diagnóstico, crie um DIAGRAMA DE ÁRVORE gerencial. Retorne APENAS JSON válido:
+{
+  "titulo": "Transformação do Processo — nome empresa",
+  "objetivo": "Objetivo central do projeto de melhoria",
+  "niveis": [
+    {
+      "id": "L1-1", "pai": null, "nivel": 1,
+      "label": "Estruturar o Processo", "tipo": "fase",
+      "descricao": "0-3 meses", "cor": "#4A90E2"
+    },
+    {
+      "id": "L2-1", "pai": "L1-1", "nivel": 2,
+      "label": "Mapear processo real", "tipo": "tarefa",
+      "descricao": "Workshop com o time", "cor": "#4A90E2"
+    },
+    {
+      "id": "L2-2", "pai": "L1-1", "nivel": 2,
+      "label": "Criar POP oficial", "tipo": "tarefa",
+      "descricao": "Responsável: Gestor", "cor": "#4A90E2"
+    },
+    {
+      "id": "L3-1", "pai": "L2-1", "nivel": 3,
+      "label": "Entrevistar SDRs", "tipo": "subtarefa",
+      "descricao": "2h · Facilitação Colink", "cor": "#6EA8E8"
+    }
+  ]
+}
+Crie pelo menos 3 fases (L1) e 3-4 tarefas por fase (L2) e subtarefas (L3).
+Use dados REAIS do diagnóstico para as iniciativas.
+CONVERSA: ${conversation}`
+      );
+      let treeData;
+      try { treeData = JSON.parse(raw.replace(/\`\`\`json|\`\`\`/g,'').trim()); }
+      catch(e) { treeData = null; }
+      downloadBlob(generateTreeDiagram(treeData, sessionName, today), 'arvore-tarefas-' + sessionName + '.html', 'text/html');
+
+  } else if (type === 'scenarios') {
+      const raw = await callAIForReport(REPORT_SYSTEM,
+        `Com base no diagnóstico, crie um MAPA DE CENÁRIOS. Retorne APENAS JSON válido:
+{
+  "titulo": "Mapa de Cenários — nome empresa",
+  "decisao_central": "Implementar automação do processo de aquisição",
+  "cenarios": [
+    {
+      "id": "C1", "nome": "Cenário Otimista",
+      "descricao": "Implementação completa em 6 meses com alta adoção",
+      "probabilidade": 35,
+      "cor": "#3ECF8E",
+      "tipo": "otimista",
+      "metricas": { "conversao": "18%", "roi_12m": "R$ 280.000", "payback": "4 meses", "risco": "Baixo" },
+      "condicoes": ["Time engajado e treinado", "Dados limpos no CRM", "Budget aprovado"],
+      "acoes": ["Implementar todos os módulos", "Treinar 100% do time", "Monitorar KPIs semanalmente"]
+    },
+    {
+      "id": "C2", "nome": "Cenário Base",
+      "descricao": "Implementação gradual em 9 meses com adoção moderada",
+      "probabilidade": 45,
+      "cor": "#4A90E2",
+      "tipo": "base",
+      "metricas": { "conversao": "13%", "roi_12m": "R$ 180.000", "payback": "7 meses", "risco": "Médio" },
+      "condicoes": ["Resistência parcial do time", "Dados parcialmente limpos", "Budget parcial"],
+      "acoes": ["Implementar Quick Wins primeiro", "Treinamento em fases", "Revisar metas trimestralmente"]
+    },
+    {
+      "id": "C3", "nome": "Cenário Pessimista",
+      "descricao": "Implementação apenas de Quick Wins por resistência ou budget",
+      "probabilidade": 20,
+      "cor": "#F87171",
+      "tipo": "pessimista",
+      "metricas": { "conversao": "10%", "roi_12m": "R$ 80.000", "payback": "11 meses", "risco": "Alto" },
+      "condicoes": ["Alta resistência da equipe", "Budget cortado", "Prioridades concorrentes"],
+      "acoes": ["Focar apenas em Quick Wins", "Fazer diagnóstico interno primeiro", "Revisitar em 6 meses"]
+    }
+  ],
+  "fatores_criticos": [
+    { "fator": "Engajamento da equipe", "peso": "Alto", "status": "Incerto", "mitigacao": "Treinamento + comunicação dos benefícios" },
+    { "fator": "Qualidade dos dados no CRM", "peso": "Alto", "status": "Crítico", "mitigacao": "Sprint de limpeza de dados — semana 1" },
+    { "fator": "Budget disponível", "peso": "Médio", "status": "Aprovado", "mitigacao": "ROI demonstrado em piloto" }
+  ]
+}
+Use dados REAIS do diagnóstico para os cenários, probabilidades e métricas.
+CONVERSA: ${conversation}`
+      );
+      let scenData;
+      try { scenData = JSON.parse(raw.replace(/\`\`\`json|\`\`\`/g,'').trim()); }
+      catch(e) { scenData = null; }
+      downloadBlob(generateScenarioMap(scenData, sessionName, today), 'mapa-cenarios-' + sessionName + '.html', 'text/html');
+
+  } else if (type === 'email') {
+      const email = await callAIForReport(REPORT_SYSTEM,
+        `Com base no diagnóstico, redija um EMAIL PROFISSIONAL COMPLETO de encaminhamento do relatório.
+
+EMPRESA: ${sessionName} ${sessionCode} | DATA: ${today}
+CONVERSA: ${conversation}
+
+Estrutura obrigatória:
+Assunto: [assunto impactante e específico]
+
+[corpo do email com]:
+- Saudação personalizada
+- Contexto da reunião/diagnóstico
+- 3-4 parágrafos: resumo dos achados, principais problemas identificados, oportunidades mapeadas
+- Destaque do ROI/impacto financeiro estimado
+- Lista dos outputs gerados em anexo
+- Próximos passos claros com call to action
+- Assinatura profissional Colink`
+      );
+      downloadBlob(email, 'email-encaminhamento-' + sessionName + '.txt', 'text/plain;charset=utf-8');
+    }
+
+  } catch(e) {
+    console.error('Erro ao gerar relatório:', e);
+    const errMsg = e.message || 'Erro desconhecido';
+    const card = document.getElementById('card-' + type);
+    if (card) {
+      const status = card.querySelector('.rstatus');
+      if (status) status.textContent = '⚠ ' + errMsg.slice(0, 60);
+    }
+  } finally {
+    _reportLock[type] = false;
+    setCardGenerating(type, false);
+  }
+}
+
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// PREMIUM GENERATORS — NotebookLM / Linear / Figma quality
+// ═══════════════════════════════════════════════════════════════════════
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// INFOGRÁFICO PREMIUM — Dashboard visual completo
+// ═══════════════════════════════════════════════════════════════════════
+function generateInfographic(d, today) {
+  if (!d) d = {};
+  const cliente  = (d.cliente  || 'Cliente').slice(0,30);
+  const processo = (d.processo || 'Processo').slice(0,40);
+  const nivel    = Math.min(5, Math.max(0, d.nivel || 0));
+  const nivelLabels = ['CAÓTICO','DEFINIDO','PADRONIZADO','DIGITALIZADO','AUTOMATIZADO','INTELIGENTE'];
+  const nivelColors = ['#F87171','#FB923C','#E8C872','#4A90E2','#3ECF8E','#A78BFA'];
+  const nivelLabel  = d.nivel_label || nivelLabels[nivel];
+  const nivelColor  = nivelColors[nivel];
+  const stepsOk  = d.steps_ok  || [];
+  const stepsNok = d.steps_nok || [];
+  const gargalos = (d.gargalos     || []).slice(0,3);
+  const opps     = (d.oportunidades|| []).slice(0,4);
+  const qw       = (d.quick_wins   || []).slice(0,3);
+  const convAtual= d.conversao_atual || '—';
+  const convMeta = d.conversao_meta  || '—';
+  const roi      = d.roi             || '—';
+
+  // SVG dimensions
+  const W = 1100, H = 720;
+
+  // Donut chart for maturity level
+  const donutR = 52, donutCx = 940, donutCy = 160;
+  const pct = nivel / 5;
+  const circ = 2 * Math.PI * donutR;
+  const dash = pct * circ;
+
+  // Step pill row
+  const stepPills = Array.from({length:10},(_,i)=>{
+    const n = i+1;
+    const ok  = stepsOk.includes(n);
+    const nok = stepsNok.includes(n);
+    const col = ok ? '#3ECF8E' : nok ? '#F87171' : '#2A3548';
+    const txt = ok ? '#3ECF8E' : nok ? '#F87171' : '#4A5568';
+    const x = 36 + i*99;
+    return `<rect x="${x}" y="215" width="90" height="28" rx="14" fill="${col}" fill-opacity="${ok||nok?.25:.15}" stroke="${col}" stroke-width="${ok||nok?1:.4}"/>
+<text x="${x+45}" y="234" font-family="Arial" font-size="11" fill="${txt}" text-anchor="middle" font-weight="${ok||nok?'700':'400'}">Step ${n} ${ok?'✓':nok?'✗':'·'}</text>`;
+  }).join('');
+
+  // Gargalo cards
+  const gargaloCards = gargalos.map((g,i)=>{
+    const y = 278 + i*62;
+    const w = W - 72;
+    return `<rect x="36" y="${y}" width="${w}" height="50" rx="8" fill="#1A0A0A" stroke="#F87171" stroke-width="1" stroke-opacity=".4"/>
+<rect x="36" y="${y}" width="4" height="50" rx="2" fill="#F87171"/>
+<rect x="40" y="${y}" width="48" height="50" fill="rgba(248,113,113,.07)"/>
+<text x="64" y="${y+22}" font-family="Arial" font-size="11" fill="#F87171" text-anchor="middle" font-weight="700">⚠</text>
+<text x="64" y="${y+36}" font-family="Arial" font-size="9" fill="#F87171" text-anchor="middle">G${i+1}</text>
+<text x="100" y="${y+20}" font-family="Arial" font-size="12" fill="#F1F5F9" font-weight="600">${g.slice(0,70)}</text>
+<text x="100" y="${y+36}" font-family="Arial" font-size="10" fill="#64748B">${g.length>70?g.slice(70,110):''}</text>`;
+  }).join('');
+
+  // Oportunidades grid (2 columns)
+  const oppStart = 278 + gargalos.length*62 + 20;
+  const oppCards = opps.map((op,i)=>{
+    const col = i%2===0 ? '#4A90E2' : '#A78BFA';
+    const typeCol = op.tipo&&op.tipo.includes('RPA') ? '#4A90E2' : '#A78BFA';
+    const x = 36 + (i%2)*517;
+    const y = oppStart + Math.floor(i/2)*60;
+    return `<rect x="${x}" y="${y}" width="505" height="50" rx="8" fill="${col}" fill-opacity=".06" stroke="${col}" stroke-width=".8" stroke-opacity=".4"/>
+<rect x="${x+8}" y="${y+10}" width="${(op.tipo||'IA').length*7+10}" height="18" rx="9" fill="${typeCol}" fill-opacity=".2"/>
+<text x="${x+8+(op.tipo||'IA').length*3.5+5}" y="${y+23}" font-family="Arial" font-size="9" fill="${typeCol}" text-anchor="middle" font-weight="700">${(op.tipo||'IA').slice(0,10)}</text>
+<text x="${x+(op.tipo||'IA').length*7+28}" y="${y+22}" font-family="Arial" font-size="11" fill="#E8E9EC" font-weight="600">${(op.desc||'').slice(0,50)}</text>
+<text x="${x+(op.tipo||'IA').length*7+28}" y="${y+37}" font-family="Arial" font-size="10" fill="#64748B">${(op.desc||'').slice(50,85)}</text>`;
+  }).join('');
+
+  // Quick wins
+  const qwStart = oppStart + Math.ceil(opps.length/2)*60 + 16;
+  const qwCards = qw.map((q,i)=>{
+    const x = 36 + i*345;
+    return `<rect x="${x}" y="${qwStart}" width="333" height="44" rx="8" fill="rgba(232,200,114,.06)" stroke="rgba(232,200,114,.25)" stroke-width="1"/>
+<text x="${x+12}" y="${qwStart+16}" font-family="Arial" font-size="9" fill="#E8C872" font-weight="700" letter-spacing="1">QUICK WIN ${i+1}</text>
+<text x="${x+12}" y="${qwStart+33}" font-family="Arial" font-size="11" fill="#E8E9EC">${q.slice(0,42)}</text>`;
+  }).join('');
+
+  const totalH = Math.max(H, qwStart + 44 + 40);
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${totalH}" width="${W}" height="${totalH}">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0A0C10"/><stop offset="100%" stop-color="#0D111A"/></linearGradient>
+  <linearGradient id="hdr" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#0F1B35"/><stop offset="100%" stop-color="#0A0C10"/></linearGradient>
+  <linearGradient id="gl" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#E8C872"/><stop offset="100%" stop-color="#F5D78E"/></linearGradient>
+</defs>
+<!-- BG -->
+<rect width="${W}" height="${totalH}" fill="url(#bg)"/>
+<!-- Header band -->
+<rect x="0" y="0" width="${W}" height="88" fill="url(#hdr)"/>
+<!-- Gold accent left -->
+<rect x="0" y="0" width="5" height="${totalH}" fill="url(#gl)"/>
+<!-- Header text -->
+<text x="28" y="26" font-family="Arial" font-size="10" fill="#E8C872" letter-spacing="3" opacity=".7">COLINK BUSINESS CONSULTING · DIAGNÓSTICO OPERACIONAL</text>
+<text x="28" y="56" font-family="Georgia,serif" font-size="24" fill="#F1F5F9" font-weight="bold">${cliente}</text>
+<text x="28" y="74" font-family="Arial" font-size="11" fill="#64748B">${processo} · ${today}</text>
+
+<!-- KPI cards -->
+<rect x="28" y="100" width="210" height="100" rx="10" fill="#12151C" stroke="#1E2535" stroke-width="1"/>
+<rect x="28" y="100" width="210" height="4" rx="2" fill="#F87171"/>
+<text x="133" y="147" font-family="Georgia,serif" font-size="28" fill="${convAtual!='—'?'#F87171':'#4A5568'}" text-anchor="middle" font-weight="bold">${convAtual}</text>
+<text x="133" y="168" font-family="Arial" font-size="10" fill="#64748B" text-anchor="middle">CONVERSÃO ATUAL</text>
+<text x="133" y="186" font-family="Arial" font-size="9" fill="#64748B" text-anchor="middle" opacity=".6">Taxa de conversão do processo</text>
+
+<rect x="252" y="100" width="210" height="100" rx="10" fill="#12151C" stroke="#1E2535" stroke-width="1"/>
+<rect x="252" y="100" width="210" height="4" rx="2" fill="#3ECF8E"/>
+<text x="357" y="147" font-family="Georgia,serif" font-size="28" fill="${convMeta!='—'?'#3ECF8E':'#4A5568'}" text-anchor="middle" font-weight="bold">${convMeta}</text>
+<text x="357" y="168" font-family="Arial" font-size="10" fill="#64748B" text-anchor="middle">META TO-BE</text>
+<text x="357" y="186" font-family="Arial" font-size="9" fill="#64748B" text-anchor="middle" opacity=".6">Projeção com IA implementada</text>
+
+<rect x="476" y="100" width="210" height="100" rx="10" fill="#12151C" stroke="#1E2535" stroke-width="1"/>
+<rect x="476" y="100" width="210" height="4" rx="2" fill="#E8C872"/>
+<text x="581" y="147" font-family="Georgia,serif" font-size="24" fill="${roi!='—'?'#E8C872':'#4A5568'}" text-anchor="middle" font-weight="bold">${roi}</text>
+<text x="581" y="168" font-family="Arial" font-size="10" fill="#64748B" text-anchor="middle">ROI ESTIMADO 12M</text>
+<text x="581" y="186" font-family="Arial" font-size="9" fill="#64748B" text-anchor="middle" opacity=".6">Retorno sobre investimento</text>
+
+<rect x="700" y="100" width="210" height="100" rx="10" fill="#12151C" stroke="#1E2535" stroke-width="1"/>
+<rect x="700" y="100" width="210" height="4" rx="2" fill="#4A90E2"/>
+<text x="805" y="147" font-family="Georgia,serif" font-size="28" fill="#4A90E2" text-anchor="middle" font-weight="bold">${stepsOk.length}/10</text>
+<text x="805" y="168" font-family="Arial" font-size="10" fill="#64748B" text-anchor="middle">STEPS OK</text>
+<text x="805" y="186" font-family="Arial" font-size="9" fill="#64748B" text-anchor="middle" opacity=".6">Metodologia 10 Steps Colink</text>
+
+<!-- Donut maturity -->
+<circle cx="${donutCx}" cy="${donutCy}" r="${donutR}" fill="none" stroke="#1E2535" stroke-width="12"/>
+<circle cx="${donutCx}" cy="${donutCy}" r="${donutR}" fill="none" stroke="${nivelColor}" stroke-width="12"
+  stroke-dasharray="${dash.toFixed(1)} ${circ.toFixed(1)}" stroke-dashoffset="${(circ/4).toFixed(1)}"
+  stroke-linecap="round"/>
+<text x="${donutCx}" y="${donutCy-8}" font-family="Georgia,serif" font-size="22" fill="${nivelColor}" text-anchor="middle" font-weight="bold">${nivel}</text>
+<text x="${donutCx}" y="${donutCy+10}" font-family="Arial" font-size="9" fill="${nivelColor}" text-anchor="middle">NÍVEL</text>
+<text x="${donutCx}" y="${donutCy+26}" font-family="Arial" font-size="9" fill="${nivelColor}" text-anchor="middle" font-weight="700">${nivelLabel}</text>
+<rect x="${donutCx-70}" y="100" width="2" height="120" fill="#1E2535"/>
+
+<!-- Section label: 10 Steps -->
+<text x="36" y="206" font-family="Arial" font-size="9" fill="#64748B" letter-spacing="2">DIAGNÓSTICO 10 STEPS COLINK</text>
+${stepPills}
+
+<!-- Section label: Gargalos -->
+<text x="36" y="268" font-family="Arial" font-size="9" fill="#64748B" letter-spacing="2">GARGALOS CRÍTICOS IDENTIFICADOS</text>
+${gargaloCards}
+
+<!-- Section label: Oportunidades -->
+<text x="36" y="${oppStart-10}" font-family="Arial" font-size="9" fill="#64748B" letter-spacing="2">OPORTUNIDADES DE AUTOMAÇÃO COM IA</text>
+${oppCards}
+
+<!-- Section label: Quick Wins -->
+<text x="36" y="${qwStart-10}" font-family="Arial" font-size="9" fill="#64748B" letter-spacing="2">QUICK WINS — AÇÕES IMEDIATAS</text>
+${qwCards}
+
+<!-- Footer -->
+<rect x="0" y="${totalH-28}" width="${W}" height="28" fill="#0F1B35" opacity=".9"/>
+<text x="28" y="${totalH-10}" font-family="Arial" font-size="9" fill="#E8C872" font-weight="700">Colink Business Consulting</text>
+<text x="${W/2}" y="${totalH-10}" font-family="Arial" font-size="9" fill="#64748B" text-anchor="middle">Diagnóstico gerado com IA · Metodologia 10 Steps Colink</text>
+<text x="${W-28}" y="${totalH-10}" font-family="Arial" font-size="9" fill="#64748B" text-anchor="end">${today}</text>
+</svg>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// BPMN — usa dados reais da IA, sem hardcode de atores
+// ═══════════════════════════════════════════════════════════════════════
+function generateBPMN(d, sessionName, today) {
+  // Default with GENERIC actors (not SDR/Closer)
+  if (!d || !d.asis || d.asis.length === 0) {
+    d = {
+      processo: sessionName, cliente: sessionName,
+      atores: ['Responsável 1','Responsável 2','Sistema'],
+      asis: [
+        {ator:'Responsável 1',etapa:'Início do Processo',descricao:'Etapa inicial',problema:false,problema_desc:''},
+        {ator:'Responsável 2',etapa:'Processamento',descricao:'Etapa principal',problema:true,problema_desc:'Sem padrão definido'},
+        {ator:'Sistema',etapa:'Registro',descricao:'Cadastro manual',problema:true,problema_desc:'Propenso a erros'},
+        {ator:'Responsável 1',etapa:'Verificação',descricao:'Checagem manual',problema:true,problema_desc:'Demora excessiva'},
+        {ator:'Responsável 2',etapa:'Aprovação',descricao:'Sem critério definido',problema:true,problema_desc:'Gargalo principal'},
+        {ator:'Sistema',etapa:'Finalização',descricao:'Output do processo',problema:false,problema_desc:''},
+      ],
+      tobe: [
+        {ator:'Sistema',etapa:'Entrada Automática',descricao:'Trigger automático',automacao:'Integração',sla:'Imediato'},
+        {ator:'Sistema',etapa:'Validação',descricao:'Regras automáticas',automacao:'RPA',sla:'<1min'},
+        {ator:'Responsável 1',etapa:'Execução',descricao:'Processo padronizado',automacao:'',sla:'2h'},
+        {ator:'Sistema',etapa:'Score/Critério',descricao:'Avaliação automática',automacao:'RPA',sla:'Automático'},
+        {ator:'Responsável 2',etapa:'Revisão',descricao:'Aprovação simplificada',automacao:'',sla:'4h'},
+        {ator:'Sistema',etapa:'Output Automático',descricao:'Gerado por IA',automacao:'Agente IA',sla:'<5min'},
+      ],
+      gargalos: ['Processo sem padrão operacional definido','Cadastros manuais propensos a erros','Aprovações sem critério claro']
+    };
+  }
+
+  const atores  = d.atores && d.atores.length ? d.atores : ['Ator 1','Ator 2','Sistema'];
+  const asis    = d.asis  || [];
+  const tobe    = d.tobe  || [];
+  const gargs   = d.gargalos || [];
+
+  const LANE_H = 110, LABEL_W = 120, STEP_W = 155, STEP_H = 58, STEP_GAP = 28;
+  const COLORS  = ['#4A90E2','#A78BFA','#3ECF8E','#FB923C','#F87171','#2DD4BF','#E8C872'];
+
+  function buildDiag(steps, title, isToBe) {
+    // Build actor list from steps (use only actors that appear)
+    const actorSet = [...new Set(steps.map(s => s.ator || '').filter(Boolean))];
+    // Merge with d.atores keeping order
+    const lanes = atores.filter(a => actorSet.some(u =>
+      u.toLowerCase().includes(a.toLowerCase().split(' ')[0]) ||
+      a.toLowerCase().includes(u.toLowerCase().split(' ')[0])
+    ));
+    // Add any actors from steps not in d.atores
+    actorSet.forEach(u => {
+      if (!lanes.some(a => u.toLowerCase().includes(a.toLowerCase().split(' ')[0]) || a.toLowerCase().includes(u.toLowerCase().split(' ')[0]))) {
+        lanes.push(u);
+      }
+    });
+    const useLanes = lanes.length > 0 ? lanes : actorSet.slice(0,4);
+
+    const W = LABEL_W + steps.length * (STEP_W + STEP_GAP) + 60;
+    const H = useLanes.length * LANE_H + 56;
+
+    let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" style="min-width:${W}px;display:block">`;
+    svg += `<rect width="${W}" height="${H}" fill="#0A0C10"/>`;
+    svg += `<rect x="0" y="0" width="${W}" height="46" fill="#0F1B35"/>`;
+    svg += `<text x="16" y="20" font-family="Georgia,serif" font-size="13" fill="#E8C872" font-weight="bold">${title}</text>`;
+    svg += `<text x="16" y="38" font-family="Arial" font-size="10" fill="#64748B">${d.cliente||sessionName} · ${d.processo||sessionName} · ${today}</text>`;
+
+    useLanes.forEach((a, li) => {
+      const y   = 46 + li * LANE_H;
+      const col = COLORS[li % COLORS.length];
+      svg += `<rect x="0" y="${y}" width="${W}" height="${LANE_H}" fill="${col}" opacity="0.05"/>`;
+      svg += `<rect x="0" y="${y}" width="${LABEL_W}" height="${LANE_H}" fill="${col}" opacity="0.12"/>`;
+      svg += `<line x1="${LABEL_W}" y1="${y}" x2="${W}" y2="${y}" stroke="#1E2535" stroke-width="0.8"/>`;
+      svg += `<line x1="0" y1="${y}" x2="${W}" y2="${y}" stroke="#1E2535" stroke-width="0.5"/>`;
+      // Actor label - fit text
+      const label = a.length > 14 ? a.slice(0,13)+'…' : a;
+      svg += `<text x="${LABEL_W/2}" y="${y+LANE_H/2+4}" font-family="Arial" font-size="11" fill="${col}" text-anchor="middle" font-weight="600" transform="rotate(-90,${LABEL_W/2},${y+LANE_H/2})">${label}</text>`;
+    });
+    svg += `<rect x="${LABEL_W}" y="46" width="1" height="${useLanes.length*LANE_H}" fill="#252D3D"/>`;
+
+    steps.forEach((step, si) => {
+      const actorName = step.ator || useLanes[0];
+      let li = useLanes.findIndex(a =>
+        a.toLowerCase().includes(actorName.toLowerCase().split(' ')[0]) ||
+        actorName.toLowerCase().includes(a.toLowerCase().split(' ')[0])
+      );
+      if (li < 0) li = si % useLanes.length;
+      const col = COLORS[li % COLORS.length];
+      const bx = LABEL_W + 16 + si * (STEP_W + STEP_GAP);
+      const by = 46 + li * LANE_H + (LANE_H - STEP_H) / 2;
+      const cx = bx + STEP_W/2;
+      const hasProb = step.problema && !isToBe;
+      const hasAuto = isToBe && step.automacao;
+      const boxCol  = hasProb ? '#F87171' : hasAuto ? '#3ECF8E' : col;
+      const boxFill = hasProb ? 'rgba(248,113,113,.1)' : hasAuto ? 'rgba(62,207,142,.1)' : `rgba(74,144,226,.05)`;
+
+      svg += `<rect x="${bx}" y="${by}" width="${STEP_W}" height="${STEP_H}" rx="8" fill="${boxFill}" stroke="${boxCol}" stroke-width="${hasProb?2:1}" stroke-dasharray="${hasProb?'5 3':'none'}"/>`;
+
+      // Step label (2 lines max)
+      const e1 = (step.etapa||'').slice(0,22);
+      const e2 = (step.etapa||'').length > 22 ? (step.etapa||'').slice(22,42) : '';
+      const d1 = (step.descricao||'').slice(0,28);
+      svg += `<text x="${cx}" y="${by+(e2?13:17)}" font-family="Arial" font-size="11" fill="${hasProb||hasAuto?boxCol:'#E8E9EC'}" text-anchor="middle" font-weight="600">${e1}</text>`;
+      if (e2) svg += `<text x="${cx}" y="${by+26}" font-family="Arial" font-size="10" fill="${hasProb||hasAuto?boxCol:'#C8D0E0'}" text-anchor="middle">${e2}</text>`;
+      svg += `<text x="${cx}" y="${by+STEP_H-8}" font-family="Arial" font-size="9" fill="#64748B" text-anchor="middle">${d1}</text>`;
+
+      if (hasProb) svg += `<text x="${bx+STEP_W-6}" y="${by+14}" font-family="Arial" font-size="14" fill="#F87171">⚠</text>`;
+
+      if (hasAuto && step.automacao) {
+        const bl = step.automacao.length * 6 + 12;
+        svg += `<rect x="${bx+4}" y="${by+STEP_H-15}" width="${bl}" height="12" rx="6" fill="#3ECF8E"/>`;
+        svg += `<text x="${bx+4+bl/2}" y="${by+STEP_H-6}" font-family="Arial" font-size="8" fill="#0A0C10" text-anchor="middle" font-weight="bold">${step.automacao}</text>`;
+      }
+      if (isToBe && step.sla) {
+        svg += `<text x="${cx}" y="${46+li*LANE_H+LANE_H-6}" font-family="Arial" font-size="9" fill="#64748B" text-anchor="middle">⏱ ${step.sla}</text>`;
+      }
+
+      // Arrow
+      if (si < steps.length - 1) {
+        const nextActor = steps[si+1].ator || useLanes[0];
+        let nli = useLanes.findIndex(a =>
+          a.toLowerCase().includes(nextActor.toLowerCase().split(' ')[0]) ||
+          nextActor.toLowerCase().includes(a.toLowerCase().split(' ')[0])
+        );
+        if (nli < 0) nli = (si+1) % useLanes.length;
+        const ax1 = bx + STEP_W, ay1 = by + STEP_H/2;
+        const ax2 = ax1 + STEP_GAP, ay2 = 46 + nli*LANE_H + LANE_H/2;
+        if (li === nli) {
+          svg += `<line x1="${ax1}" y1="${ay1}" x2="${ax2}" y2="${ay1}" stroke="#2A3548" stroke-width="1.5" marker-end="url(#arw${isToBe?'T':'A'})"/>`;
+        } else {
+          const mx = ax1 + STEP_GAP/2;
+          svg += `<path d="M${ax1} ${ay1} L${mx} ${ay1} L${mx} ${ay2} L${ax2} ${ay2}" fill="none" stroke="#2A3548" stroke-width="1.5" marker-end="url(#arw${isToBe?'T':'A'})"/>`;
+        }
+      }
+    });
+
+    svg += `<defs><marker id="arw${isToBe?'T':'A'}" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#2A3548"/></marker></defs>`;
+    svg += `</svg>`;
+    return { svg, w: W, h: H };
+  }
+
+  const asisD = buildDiag(asis, 'PROCESSO AS-IS — SITUAÇÃO ATUAL', false);
+  const tobeD = buildDiag(tobe, 'PROCESSO TO-BE — FUTURO COM IA',  true);
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Processo em Caixinhas — ${sessionName}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0A0C10;font-family:Arial,sans-serif;padding:32px 24px;color:#E8E9EC}
+.page{max-width:1300px;margin:0 auto}
+h1{font-family:Georgia,serif;color:#E8C872;font-size:22px;margin-bottom:4px}
+.sub{color:#64748B;font-size:12px;margin-bottom:32px}
+.sec{margin-bottom:44px}
+.sec-title{font-size:10px;font-weight:700;letter-spacing:.14em;color:#64748B;text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.sec-title::after{content:'';flex:1;height:1px;background:#1E2535}
+.diag-wrap{background:#0A0C10;border:1px solid #1E2535;border-radius:12px;overflow-x:auto;padding:0}
+.gargs{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-top:4px}
+.garg{background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);border-left:3px solid #F87171;border-radius:8px;padding:11px 14px;font-size:12px;color:#FCA5A5;line-height:1.5}
+.garg b{display:block;font-size:10px;color:#F87171;margin-bottom:2px;letter-spacing:.05em}
+.legend{display:flex;flex-wrap:wrap;gap:18px;padding:14px 18px;background:#12151C;border:1px solid #1E2535;border-radius:10px;margin-top:8px}
+.li{display:flex;align-items:center;gap:8px;font-size:11px;color:#94A3B8}
+.lb{width:38px;height:18px;border-radius:4px}
+footer{text-align:center;font-size:11px;color:#334155;margin-top:32px;padding-top:14px;border-top:1px solid #1E2535}
+</style>
+</head>
+<body>
+<div class="page">
+<h1>Processo em Caixinhas — ${d.processo||sessionName}</h1>
+<div class="sub">${d.cliente||sessionName} · ${today} · Colink Business Consulting</div>
+<div class="sec">
+  <div class="sec-title">AS-IS — Processo atual (problemas marcados em vermelho ⚠)</div>
+  <div class="diag-wrap">${asisD.svg}</div>
+</div>
+<div class="sec">
+  <div class="sec-title">TO-BE — Processo futuro com automações e SLAs</div>
+  <div class="diag-wrap">${tobeD.svg}</div>
+</div>
+<div class="sec">
+  <div class="sec-title">Gargalos identificados no diagnóstico</div>
+  <div class="gargs">${gargs.map((g,i)=>`<div class="garg"><b>GARGALO ${i+1}</b>${g}</div>`).join('')}</div>
+</div>
+<div class="legend">
+  <div class="li"><div class="lb" style="background:rgba(248,113,113,.15);border:2px dashed #F87171"></div>Etapa com problema (AS-IS)</div>
+  <div class="li"><div class="lb" style="background:rgba(62,207,142,.15);border:1px solid #3ECF8E"></div>Etapa automatizada (TO-BE)</div>
+  <div class="li"><div class="lb" style="background:rgba(74,144,226,.1);border:1px solid #4A90E2"></div>Etapa manual</div>
+  <div class="li" style="color:#475569">Swimlanes = responsáveis reais do processo · ⏱ = SLA definido</div>
+</div>
+<footer>Colink Business Consulting · colink.com.br · ${today}</footer>
+</div>
+</body>
+</html>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// MAPA MENTAL — layout sem sobreposição
+// ═══════════════════════════════════════════════════════════════════════
+function generateMindMap(d, sessionName) {
+  const ramos = d ? (d.ramos || []) : [];
+  const centro = d ? (d.centro || sessionName) : sessionName;
+
+  // Canvas dimensions
+  const W = 1200, H = 800;
+  const CX = W/2, CY = H/2;
+  const BRANCH_R = 230;  // branch node distance from center
+  const LEAF_R   = 160;  // leaf distance from branch
+
+  // Build HTML nodes + SVG lines
+  let nodesHTML = '';
+  let linesJS   = '';
+
+  // Center node
+  nodesHTML += `<div class="cn" style="left:${CX}px;top:${CY}px">${centro}</div>\n`;
+
+  ramos.forEach((r, i, arr) => {
+    // Evenly distributed angles, starting from top
+    const angle = (i / arr.length) * 2 * Math.PI - Math.PI / 2;
+    const bx = CX + Math.cos(angle) * BRANCH_R;
+    const by = CY + Math.sin(angle) * BRANCH_R;
+
+    nodesHTML += `<div class="bn" style="left:${bx.toFixed(0)}px;top:${by.toFixed(0)}px;background:${r.cor};box-shadow:0 0 20px ${r.cor}33">${r.label}</div>\n`;
+    linesJS   += `L(${CX},${CY},${bx.toFixed(0)},${by.toFixed(0)},"${r.cor}",2.5,0.5);\n`;
+
+    const filhos = r.filhos || [];
+    const count  = filhos.length;
+
+    filhos.forEach((f, j) => {
+      // Fan out leaves: spread them so they don't overlap
+      // Spread angle: narrower fan for fewer children
+      const spread = Math.min(0.8, 0.3 * count);
+      const la = angle + (j - (count-1)/2) * (count > 1 ? spread/(count-1) : 0);
+      const lx = bx + Math.cos(la) * LEAF_R;
+      const ly = by + Math.sin(la) * LEAF_R;
+
+      nodesHTML += `<div class="ln" style="left:${lx.toFixed(0)}px;top:${ly.toFixed(0)}px;border-color:${r.cor}44">${f}</div>\n`;
+      linesJS   += `L(${bx.toFixed(0)},${by.toFixed(0)},${lx.toFixed(0)},${ly.toFixed(0)},"${r.cor}",1.5,0.35);\n`;
+    });
+  });
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Mapa Mental — ${sessionName}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0A0C10;font-family:Arial,sans-serif;padding:24px;display:flex;flex-direction:column;align-items:center;min-height:100vh}
+h2{font-family:Georgia,serif;color:#E8C872;font-size:18px;margin-bottom:20px}
+.wrap{position:relative;width:${W}px;height:${H}px;flex-shrink:0}
+svg.lines{position:absolute;inset:0;pointer-events:none;overflow:visible}
+.cn{
+  position:absolute;transform:translate(-50%,-50%);
+  background:linear-gradient(135deg,#0F1B35,#1A3A6E);
+  color:#E8C872;border-radius:50%;width:130px;height:130px;
+  display:flex;align-items:center;justify-content:center;
+  text-align:center;font-weight:700;font-size:13px;padding:14px;
+  border:2px solid rgba(232,200,114,.3);z-index:10;
+  box-shadow:0 0 40px rgba(232,200,114,.15)
+}
+.bn{
+  position:absolute;transform:translate(-50%,-50%);
+  border-radius:10px;padding:8px 16px;
+  font-size:11px;font-weight:700;color:#0A0C10;
+  text-align:center;z-index:8;white-space:nowrap;
+  min-width:80px
+}
+.ln{
+  position:absolute;transform:translate(-50%,-50%);
+  background:#12151C;border:1px solid #252D3D;
+  border-radius:8px;padding:6px 10px;
+  font-size:10px;color:#94A3B8;
+  text-align:center;z-index:6;
+  max-width:148px;line-height:1.35;word-break:break-word
+}
+footer{color:#334155;font-size:11px;margin-top:20px}
+</style>
+</head>
+<body>
+<h2>Mapa Mental — ${sessionName}</h2>
+<div class="wrap">
+  <svg class="lines" id="sv" viewBox="0 0 ${W} ${H}"></svg>
+  ${nodesHTML}
+</div>
+<footer>Colink Business Consulting · Diagnóstico com IA</footer>
+<script>
+(function(){
+  var sv = document.getElementById('sv');
+  function L(x1,y1,x2,y2,color,w,op){
+    var e = document.createElementNS('http://www.w3.org/2000/svg','line');
+    e.setAttribute('x1',x1); e.setAttribute('y1',y1);
+    e.setAttribute('x2',x2); e.setAttribute('y2',y2);
+    e.setAttribute('stroke',color);
+    e.setAttribute('stroke-width',w);
+    e.setAttribute('opacity',op);
+    sv.appendChild(e);
+  }
+  ${linesJS}
+})();
+<\/script>
+<\/body>
+<\/html>`;
+}
+
+
+function generatePPTPreview(d, today) {
+  const slides = d.slides || [];
+  const cli = d.cliente || 'Cliente';
+
+  const slideHTML = slides.map((sl, i) => {
+    let body = '';
+    if (sl.tipo === 'cover') {
+      body = `<div class="cover-body"><div class="cover-title">${sl.conteudo || ''}</div><div class="cover-meta">${cli} · ${today}</div></div>`;
+    } else if (sl.tipo === 'bullets' && Array.isArray(sl.conteudo)) {
+      body = `<ul class="bullets">${sl.conteudo.map(b => `<li>${b}</li>`).join('')}</ul>`;
+    } else if (sl.tipo === 'table' && Array.isArray(sl.conteudo)) {
+      body = `<table><thead><tr>${sl.conteudo[0].map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${sl.conteudo.slice(1).map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+    } else {
+      body = `<p class="slide-text">${sl.conteudo || ''}</p>`;
+    }
+    return `<div class="slide">
+      <div class="slide-num">${String(i+1).padStart(2,'0')} / ${String(slides.length).padStart(2,'0')}</div>
+      <div class="slide-title">${sl.titulo || ''}</div>
+      <div class="slide-body">${body}</div>
+    </div>`;
+  }).join('');
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8"><title>Apresentação — ${cli}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0A0C10;font-family:Arial,sans-serif;padding:32px;color:#E8E9EC}
+h1{font-family:Georgia,serif;color:#E8C872;font-size:18px;margin-bottom:8px}
+.sub{color:#64748B;font-size:11px;margin-bottom:32px}
+.slide{background:#0F1B35;border-radius:14px;padding:32px 36px;margin-bottom:20px;max-width:900px;border-left:4px solid #E8C872;position:relative;overflow:hidden}
+.slide::before{content:'';position:absolute;top:0;right:0;width:200px;height:100%;background:linear-gradient(135deg,transparent,rgba(232,200,114,.03));pointer-events:none}
+.slide-num{font-size:10px;color:#334155;letter-spacing:.15em;margin-bottom:8px;font-weight:700}
+.slide-title{font-family:Georgia,serif;font-size:22px;color:#E8C872;margin-bottom:18px;line-height:1.3}
+.slide-body{font-size:13px;color:#94A3B8;line-height:1.7}
+.cover-body{text-align:center;padding:16px 0}
+.cover-title{font-size:16px;color:#E8E9EC;margin-bottom:8px}
+.cover-meta{font-size:12px;color:#64748B}
+.bullets{list-style:none;padding:0}
+.bullets li{padding:7px 0 7px 20px;border-bottom:1px solid rgba(255,255,255,.04);position:relative;color:#C8D0E0}
+.bullets li::before{content:"→";position:absolute;left:0;color:#E8C872;font-weight:bold}
+table{border-collapse:collapse;width:100%;font-size:12px}
+th{background:rgba(232,200,114,.1);color:#E8C872;padding:8px 12px;text-align:left;font-size:11px;border-bottom:1px solid rgba(232,200,114,.2)}
+td{padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.04);color:#94A3B8}
+tr:hover td{background:rgba(255,255,255,.02)}
+.slide-text{color:#C8D0E0;font-size:14px;line-height:1.8}
+footer{text-align:center;font-size:11px;color:#334155;margin-top:24px;padding-top:16px;border-top:1px solid #1E2535}
+</style></head><body>
+<h1>Apresentação Executiva — ${cli}</h1>
+<div class="sub">${today} · Colink Business Consulting · ${slides.length} slides</div>
+${slideHTML}
+<footer>Colink Business Consulting · colink.com.br</footer>
+</body></html>`;
+}
+
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// DECISION TREE — Fluxograma de Árvore de Decisão
+// ═══════════════════════════════════════════════════════════════════════
+function generateDecisionTree(d, sessionName, today) {
+  const titulo = d ? d.titulo : 'Árvore de Decisão — ' + sessionName;
+  const descricao = d ? d.descricao : 'Guia de decisão para transformação do processo';
+  const raiz = d ? d.raiz : null;
+
+  // Build node list from nested structure
+  const nodes = [];
+  const edges = [];
+  let nodeId = 0;
+
+  function traverse(node, parentId, edgeLabel, depth, x, spanWidth) {
+    if (!node) return;
+    const id = nodeId++;
+    const isLeaf = !!node.acao;
+    const typeColors = {
+      sucesso: { bg: 'rgba(62,207,142,.15)', border: '#3ECF8E', text: '#3ECF8E', icon: '✓' },
+      acao:    { bg: 'rgba(74,144,226,.15)', border: '#4A90E2', text: '#4A90E2', icon: '→' },
+      urgente: { bg: 'rgba(251,146,60,.15)', border: '#FB923C', text: '#FB923C', icon: '⚡' },
+      critico: { bg: 'rgba(248,113,113,.15)', border: '#F87171', text: '#F87171', icon: '⚠' },
+    };
+    const leafStyle = typeColors[node.tipo] || typeColors.acao;
+
+    nodes.push({
+      id, parentId, edgeLabel, depth, x,
+      text: isLeaf ? node.acao : node.pergunta,
+      isLeaf, isQuestion: !isLeaf,
+      impacto: node.impacto || '',
+      prazo: node.prazo || '',
+      leafStyle: isLeaf ? leafStyle : null,
+      tipo: node.tipo || ''
+    });
+
+    if (!isLeaf) {
+      const half = spanWidth / 2;
+      if (node.sim) traverse(node.sim, id, 'SIM', depth + 1, x - half / 2, half);
+      if (node.nao) traverse(node.nao, id, 'NÃO', depth + 1, x + half / 2, half);
+    }
+  }
+
+  const defaultRaiz = {
+    pergunta: 'Processo está documentado?',
+    sim: {
+      pergunta: 'Dados estão íntegros?',
+      sim: { acao: 'Avançar para automação', tipo: 'sucesso', impacto: 'Alto', prazo: '3-6m' },
+      nao: { acao: 'Limpar base de dados', tipo: 'urgente', impacto: 'Alto', prazo: '0-3m' }
+    },
+    nao: {
+      pergunta: 'Há POP existente?',
+      sim: { acao: 'Formalizar e comunicar POP', tipo: 'acao', impacto: 'Alto', prazo: '0-3m' },
+      nao: { acao: 'Workshop de mapeamento urgente', tipo: 'critico', impacto: 'Crítico', prazo: 'Imediato' }
+    }
+  };
+
+  traverse(raiz || defaultRaiz, null, null, 0, 500, 800);
+
+  // Layout: calculate y positions by depth
+  const depthMap = {};
+  nodes.forEach(n => {
+    if (!depthMap[n.depth]) depthMap[n.depth] = [];
+    depthMap[n.depth].push(n);
+  });
+
+  const LEVEL_H = 160, NODE_W = 200, NODE_H = 70;
+  const maxDepth = Math.max(...nodes.map(n => n.depth));
+  const totalH = (maxDepth + 1) * LEVEL_H + 120;
+  const totalW = 1100;
+
+  // Redistribute x positions evenly per level
+  Object.keys(depthMap).forEach(dep => {
+    const level = depthMap[dep];
+    const gap = totalW / (level.length + 1);
+    level.forEach((n, i) => { n.x = gap * (i + 1); });
+  });
+
+  // Assign y
+  nodes.forEach(n => { n.y = 80 + n.depth * LEVEL_H; });
+
+  // Build edges
+  nodes.forEach(n => {
+    if (n.parentId !== null) {
+      const parent = nodes[n.parentId];
+      if (parent) {
+        edges.push({ x1: parent.x, y1: parent.y + NODE_H, x2: n.x, y2: n.y, label: n.edgeLabel });
+      }
+    }
+  });
+
+  // Render SVG
+  let svgEdges = edges.map(e => {
+    const mx = (e.x1 + e.x2) / 2;
+    const my = (e.y1 + e.y2) / 2;
+    const isYes = e.label === 'SIM';
+    const col = isYes ? '#3ECF8E' : '#F87171';
+    return `<path d="M${e.x1},${e.y1} C${e.x1},${my} ${e.x2},${my} ${e.x2},${e.y2}" fill="none" stroke="${col}" stroke-width="1.5" opacity="0.5"/>
+    <rect x="${mx - 16}" y="${my - 9}" width="32" height="18" rx="9" fill="${isYes ? 'rgba(62,207,142,.2)' : 'rgba(248,113,113,.2)'}"/>
+    <text x="${mx}" y="${my + 5}" text-anchor="middle" font-family="Arial" font-size="10" fill="${col}" font-weight="bold">${e.label}</text>`;
+  }).join('');
+
+  let svgNodes = nodes.map(n => {
+    if (n.isLeaf) {
+      const s = n.leafStyle;
+      return `<rect x="${n.x - NODE_W/2}" y="${n.y}" width="${NODE_W}" height="${NODE_H}" rx="10" fill="${s.bg}" stroke="${s.border}" stroke-width="1.5"/>
+      <text x="${n.x - NODE_W/2 + 8}" y="${n.y + 16}" font-family="Arial" font-size="14" fill="${s.text}">${s.icon}</text>
+      <foreignObject x="${n.x - NODE_W/2 + 6}" y="${n.y + 4}" width="${NODE_W - 12}" height="${NODE_H - 12}">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Arial;font-size:11px;color:${s.text};line-height:1.35;padding-top:4px;padding-left:18px">${n.text.slice(0,80)}</div>
+      </foreignObject>
+      ${n.prazo ? `<rect x="${n.x - NODE_W/2 + 4}" y="${n.y + NODE_H - 18}" width="${n.prazo.length * 7 + 8}" height="14" rx="7" fill="${s.border}" opacity="0.3"/>
+      <text x="${n.x - NODE_W/2 + 8}" y="${n.y + NODE_H - 7}" font-family="Arial" font-size="8" fill="${s.text}">${n.prazo}</text>` : ''}`;
+    } else {
+      // Decision diamond (using rotated rect visually approximated)
+      const DW = NODE_W, DH = NODE_H;
+      return `<rect x="${n.x - DW/2}" y="${n.y}" width="${DW}" height="${DH}" rx="6" fill="rgba(26,115,232,.1)" stroke="#4A90E2" stroke-width="1.5"/>
+      <polygon points="${n.x},${n.y} ${n.x+14},${n.y+14} ${n.x},${n.y+28} ${n.x-14},${n.y+14}" fill="#4A90E2" opacity="0.8"/>
+      <foreignObject x="${n.x - DW/2 + 4}" y="${n.y + 8}" width="${DW - 8}" height="${DH - 16}">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Arial;font-size:11px;color:#E8E9EC;line-height:1.35;text-align:center;padding:2px 4px">${n.text.slice(0,70)}</div>
+      </foreignObject>`;
+    }
+  }).join('');
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Árvore de Decisão — ${sessionName}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0A0C10;font-family:Arial,sans-serif;padding:32px;color:#E8E9EC}
+.page{max-width:1200px;margin:0 auto}
+h1{font-family:Georgia,serif;color:#E8C872;font-size:22px;margin-bottom:4px}
+.sub{color:#64748B;font-size:12px;margin-bottom:8px}
+.desc{color:#94A3B8;font-size:13px;margin-bottom:28px;padding:10px 14px;background:#12151C;border-radius:8px;border-left:3px solid #4A90E2}
+.diagram{background:#0A0C10;border:1px solid #1E2535;border-radius:12px;overflow-x:auto;padding:8px}
+.legend{display:flex;flex-wrap:wrap;gap:16px;padding:14px 18px;background:#12151C;border:1px solid #1E2535;border-radius:10px;margin-top:12px}
+.li{display:flex;align-items:center;gap:8px;font-size:11px;color:#94A3B8}
+.lb{width:36px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:bold}
+footer{text-align:center;font-size:11px;color:#334155;margin-top:28px;padding-top:14px;border-top:1px solid #1E2535}
+</style>
+</head>
+<body>
+<div class="page">
+<h1>Árvore de Decisão — ${sessionName}</h1>
+<div class="sub">${today} · Colink Business Consulting</div>
+<div class="desc">${descricao}</div>
+<div class="diagram">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalW} ${totalH}" width="100%" style="min-width:${totalW}px">
+<rect width="${totalW}" height="${totalH}" fill="#0A0C10"/>
+${svgEdges}
+${svgNodes}
+</svg>
+</div>
+<div class="legend">
+  <div class="li"><div class="lb" style="background:rgba(62,207,142,.2);border:1px solid #3ECF8E;color:#3ECF8E">✓</div>Ação de sucesso</div>
+  <div class="li"><div class="lb" style="background:rgba(74,144,226,.2);border:1px solid #4A90E2;color:#4A90E2">→</div>Ação necessária</div>
+  <div class="li"><div class="lb" style="background:rgba(251,146,60,.2);border:1px solid #FB923C;color:#FB923C">⚡</div>Urgente</div>
+  <div class="li"><div class="lb" style="background:rgba(248,113,113,.2);border:1px solid #F87171;color:#F87171">⚠</div>Crítico — agir agora</div>
+  <div class="li"><div class="lb" style="background:rgba(26,115,232,.12);border:1px solid #4A90E2">◆</div>Ponto de decisão</div>
+  <div class="li" style="color:#475569">Siga as setas: verde = SIM · vermelho = NÃO</div>
+</div>
+<footer>Colink Business Consulting · colink.com.br · ${today}</footer>
+</div>
+</body>
+</html>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// TREE DIAGRAM — Diagrama de Árvore Gerencial
+// ═══════════════════════════════════════════════════════════════════════
+function generateTreeDiagram(d, sessionName, today) {
+  const titulo = d ? d.titulo : 'Diagrama de Árvore — ' + sessionName;
+  const objetivo = d ? d.objetivo : 'Transformação Operacional com IA';
+  const niveis = d ? (d.niveis || []) : [];
+
+  // Default if no data
+  const defaultNiveis = [
+    {id:'L1-1',pai:null,nivel:1,label:'Estruturar o Processo',tipo:'fase',descricao:'0-3 meses',cor:'#4A90E2'},
+    {id:'L1-2',pai:null,nivel:1,label:'Digitalizar',tipo:'fase',descricao:'3-6 meses',cor:'#3ECF8E'},
+    {id:'L1-3',pai:null,nivel:1,label:'Automatizar com IA',tipo:'fase',descricao:'6-12 meses',cor:'#A78BFA'},
+    {id:'L2-1',pai:'L1-1',nivel:2,label:'Mapear processo real',tipo:'tarefa',descricao:'Workshop time',cor:'#4A90E2'},
+    {id:'L2-2',pai:'L1-1',nivel:2,label:'Criar POP oficial',tipo:'tarefa',descricao:'Gestor responsável',cor:'#4A90E2'},
+    {id:'L2-3',pai:'L1-1',nivel:2,label:'Limpar dados CRM',tipo:'tarefa',descricao:'Sprint 1 semana',cor:'#4A90E2'},
+    {id:'L2-4',pai:'L1-2',nivel:2,label:'Pipeline completo CRM',tipo:'tarefa',descricao:'HubSpot configurado',cor:'#3ECF8E'},
+    {id:'L2-5',pai:'L1-2',nivel:2,label:'Follow-up automático',tipo:'tarefa',descricao:'RPA Workflow',cor:'#3ECF8E'},
+    {id:'L2-6',pai:'L1-3',nivel:2,label:'Agente IA qualificação',tipo:'tarefa',descricao:'GPT-4o integrado',cor:'#A78BFA'},
+    {id:'L2-7',pai:'L1-3',nivel:2,label:'Proposta automática',tipo:'tarefa',descricao:'Geração via IA',cor:'#A78BFA'},
+    {id:'L3-1',pai:'L2-1',nivel:3,label:'Entrevistar SDRs',tipo:'subtarefa',descricao:'2h Colink',cor:'#6EA8E8'},
+    {id:'L3-2',pai:'L2-1',nivel:3,label:'Mapear exceções',tipo:'subtarefa',descricao:'Closers + Gestor',cor:'#6EA8E8'},
+    {id:'L3-3',pai:'L2-4',nivel:3,label:'Configurar estágios',tipo:'subtarefa',descricao:'HubSpot Admin',cor:'#6ED4A8'},
+  ];
+  const items = niveis.length > 0 ? niveis : defaultNiveis;
+
+  // Build tree structure
+  const byId = {};
+  items.forEach(it => { byId[it.id] = { ...it, children: [] }; });
+  const roots = [];
+  items.forEach(it => {
+    if (it.pai && byId[it.pai]) byId[it.pai].children.push(byId[it.id]);
+    else if (!it.pai) roots.push(byId[it.id]);
+  });
+
+  // Render as horizontal tree HTML with connectors
+  function renderNode(node, depth) {
+    const typeStyles = {
+      fase: `background:rgba(${hexToRgb(node.cor)},0.15);border:2px solid ${node.cor};border-radius:10px;padding:10px 16px;`,
+      tarefa: `background:rgba(${hexToRgb(node.cor)},0.08);border:1px solid ${node.cor};border-radius:8px;padding:8px 14px;`,
+      subtarefa: `background:#12151C;border:1px solid #1E2535;border-radius:6px;padding:6px 12px;`,
+    };
+    const style = typeStyles[node.tipo] || typeStyles.tarefa;
+    const labelSize = node.tipo === 'fase' ? '14px' : node.tipo === 'tarefa' ? '12px' : '11px';
+    const labelColor = node.tipo === 'fase' ? node.cor : node.tipo === 'tarefa' ? '#E8E9EC' : '#94A3B8';
+
+    const childrenHTML = node.children.length > 0
+      ? `<div style="display:flex;flex-direction:column;gap:8px;padding-left:32px;position:relative">
+          <div style="position:absolute;left:0;top:0;bottom:0;width:2px;background:${node.cor};opacity:0.3;margin-left:-1px"></div>
+          ${node.children.map(c => renderNode(c, depth+1)).join('')}
+        </div>`
+      : '';
+
+    return `<div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:center;gap:0">
+        ${depth > 0 ? `<div style="width:24px;height:2px;background:${node.cor};opacity:0.4;flex-shrink:0"></div>` : ''}
+        <div style="${style}min-width:${node.tipo==='fase'?'200px':node.tipo==='tarefa'?'180px':'160px'};max-width:${node.tipo==='fase'?'240px':'200px'}">
+          <div style="font-family:Arial;font-size:${labelSize};color:${labelColor};font-weight:${node.tipo==='fase'?'700':'500'};line-height:1.3">${node.label}</div>
+          ${node.descricao ? `<div style="font-family:Arial;font-size:10px;color:#64748B;margin-top:2px">${node.descricao}</div>` : ''}
+        </div>
+      </div>
+      ${childrenHTML}
+    </div>`;
+  }
+
+  function hexToRgb(hex) {
+    const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+    return `${r},${g},${b}`;
+  }
+
+  const treeHTML = roots.map(r => renderNode(r, 0)).join('<div style="height:24px"></div>');
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diagrama de Árvore — ${sessionName}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0A0C10;font-family:Arial,sans-serif;padding:32px;color:#E8E9EC}
+.page{max-width:1200px;margin:0 auto}
+h1{font-family:Georgia,serif;color:#E8C872;font-size:22px;margin-bottom:4px}
+.sub{color:#64748B;font-size:12px;margin-bottom:16px}
+.obj{background:#0F1B35;border-radius:12px;padding:16px 20px;margin-bottom:28px;display:flex;align-items:center;gap:12px;border:1px solid rgba(232,200,114,.2)}
+.obj-icon{width:44px;height:44px;background:linear-gradient(135deg,#E8C872,#F5D78E);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.obj-title{font-size:16px;font-weight:700;color:#E8C872}
+.obj-sub{font-size:12px;color:#64748B;margin-top:2px}
+.tree-wrap{background:#0A0C10;border:1px solid #1E2535;border-radius:12px;padding:24px;overflow-x:auto}
+.legend{display:flex;flex-wrap:wrap;gap:16px;padding:12px 16px;background:#12151C;border:1px solid #1E2535;border-radius:10px;margin-top:12px}
+.li{display:flex;align-items:center;gap:8px;font-size:11px;color:#94A3B8}
+.lb{width:16px;height:16px;border-radius:3px}
+footer{text-align:center;font-size:11px;color:#334155;margin-top:28px;padding-top:14px;border-top:1px solid #1E2535}
+</style>
+</head>
+<body>
+<div class="page">
+<h1>Diagrama de Árvore — ${sessionName}</h1>
+<div class="sub">${today} · Colink Business Consulting</div>
+<div class="obj">
+  <div class="obj-icon">🎯</div>
+  <div><div class="obj-title">${objetivo}</div><div class="obj-sub">Desdobramento hierárquico de fases, tarefas e subtarefas</div></div>
+</div>
+<div class="tree-wrap">
+  <div style="display:flex;flex-direction:row;gap:24px;align-items:flex-start;flex-wrap:nowrap;overflow-x:auto">
+    ${treeHTML}
+  </div>
+</div>
+<div class="legend">
+  <div class="li"><div class="lb" style="background:#4A90E2;border-radius:5px"></div>Fase (nível 1)</div>
+  <div class="li"><div class="lb" style="background:#1E2535;border:1px solid #4A90E2"></div>Tarefa (nível 2)</div>
+  <div class="li"><div class="lb" style="background:#12151C;border:1px solid #1E2535"></div>Subtarefa (nível 3)</div>
+  <div class="li" style="color:#475569">Leia da esquerda para direita: objetivo → fases → tarefas → subtarefas</div>
+</div>
+<footer>Colink Business Consulting · colink.com.br · ${today}</footer>
+</div>
+</body>
+</html>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SCENARIO MAP — Mapa de Cenários com Probabilidades
+// ═══════════════════════════════════════════════════════════════════════
+function generateScenarioMap(d, sessionName, today) {
+  const titulo = d ? d.titulo : 'Mapa de Cenários — ' + sessionName;
+  const decisao = d ? d.decisao_central : 'Implementar transformação do processo';
+  const cenarios = d ? (d.cenarios || []) : [];
+  const fatores = d ? (d.fatores_criticos || []) : [];
+
+  const defaultCenarios = [
+    {id:'C1',nome:'Cenário Otimista',descricao:'Implementação completa com alta adoção do time',probabilidade:35,cor:'#3ECF8E',tipo:'otimista',metricas:{conversao:'18%',roi_12m:'R$ 280k',payback:'4m',risco:'Baixo'},condicoes:['Time engajado','CRM limpo','Budget aprovado'],acoes:['Implementar todos os módulos','Treinar 100% do time']},
+    {id:'C2',nome:'Cenário Base',descricao:'Implementação gradual com adoção moderada',probabilidade:45,cor:'#4A90E2',tipo:'base',metricas:{conversao:'13%',roi_12m:'R$ 180k',payback:'7m',risco:'Médio'},condicoes:['Resistência parcial','Dados parcialmente limpos'],acoes:['Quick Wins primeiro','Revisão trimestral']},
+    {id:'C3',nome:'Cenário Pessimista',descricao:'Apenas Quick Wins por resistência ou budget',probabilidade:20,cor:'#F87171',tipo:'pessimista',metricas:{conversao:'10%',roi_12m:'R$ 80k',payback:'11m',risco:'Alto'},condicoes:['Alta resistência','Budget cortado'],acoes:['Focar em Quick Wins','Revisitar em 6 meses']},
+  ];
+  const items = cenarios.length > 0 ? cenarios : defaultCenarios;
+
+  const fatorStatus = { 'Aprovado':'#3ECF8E','Confirmado':'#3ECF8E','Crítico':'#F87171','Risco':'#F87171','Incerto':'#FB923C','Em análise':'#FB923C','OK':'#3ECF8E' };
+
+  const cenariosHTML = items.map(c => {
+    const prob = c.probabilidade || 0;
+    const barW = Math.round(prob * 2.2);
+    const metricsList = Object.entries(c.metricas || {}).map(([k,v]) =>
+      `<div style="background:#0A0C10;border-radius:6px;padding:8px 10px;text-align:center">
+        <div style="font-size:15px;font-weight:700;color:${c.cor}">${v}</div>
+        <div style="font-size:9px;color:#64748B;margin-top:2px;text-transform:capitalize">${k.replace('_',' ')}</div>
+      </div>`
+    ).join('');
+
+    return `<div style="background:#12151C;border:1px solid ${c.cor};border-radius:12px;padding:20px 22px;border-top:3px solid ${c.cor}">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
+        <div>
+          <div style="font-size:15px;font-weight:700;color:${c.cor};margin-bottom:3px">${c.nome}</div>
+          <div style="font-size:12px;color:#94A3B8;line-height:1.4;max-width:380px">${c.descricao}</div>
+        </div>
+        <div style="text-align:center;min-width:70px">
+          <div style="font-size:28px;font-weight:700;color:${c.cor}">${prob}%</div>
+          <div style="font-size:9px;color:#64748B">probabilidade</div>
+        </div>
+      </div>
+      <!-- Probability bar -->
+      <div style="background:#1E2535;border-radius:4px;height:6px;margin-bottom:16px;overflow:hidden">
+        <div style="width:${barW}px;max-width:100%;height:100%;background:${c.cor};border-radius:4px;transition:width .3s"></div>
+      </div>
+      <!-- Metrics -->
+      <div style="display:grid;grid-template-columns:repeat(${Math.min(Object.keys(c.metricas||{}).length,4)},1fr);gap:8px;margin-bottom:14px">
+        ${metricsList}
+      </div>
+      <!-- Conditions + Actions -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <div style="font-size:10px;color:#64748B;font-weight:700;letter-spacing:.08em;margin-bottom:6px">CONDIÇÕES</div>
+          ${(c.condicoes||[]).map(cond => `<div style="font-size:11px;color:#94A3B8;padding:3px 0;border-bottom:1px solid #1E2535;display:flex;gap:6px"><span style="color:${c.cor}">•</span>${cond}</div>`).join('')}
+        </div>
+        <div>
+          <div style="font-size:10px;color:#64748B;font-weight:700;letter-spacing:.08em;margin-bottom:6px">AÇÕES CHAVE</div>
+          ${(c.acoes||[]).map(a => `<div style="font-size:11px;color:#94A3B8;padding:3px 0;border-bottom:1px solid #1E2535;display:flex;gap:6px"><span style="color:${c.cor}">→</span>${a}</div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const totalProb = items.reduce((s,c) => s+(c.probabilidade||0), 0);
+  const probChart = items.map(c => {
+    const angle = ((c.probabilidade||0) / totalProb) * 360;
+    return { ...c, angle };
+  });
+
+  const fatoresHTML = fatores.length > 0 ? fatores.map(f => {
+    const sc = fatorStatus[f.status] || '#FB923C';
+    const pesoColors = {'Alto':'#F87171','Médio':'#FB923C','Baixo':'#3ECF8E'};
+    const pc = pesoColors[f.peso] || '#64748B';
+    return `<div style="background:#12151C;border:1px solid #1E2535;border-radius:8px;padding:12px 14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="font-size:12px;font-weight:600;color:#E8E9EC">${f.fator}</div>
+        <div style="display:flex;gap:6px">
+          <span style="font-size:9px;background:${pc}22;color:${pc};border:1px solid ${pc}44;padding:2px 8px;border-radius:10px;font-weight:600">${f.peso}</span>
+          <span style="font-size:9px;background:${sc}22;color:${sc};border:1px solid ${sc}44;padding:2px 8px;border-radius:10px;font-weight:600">${f.status}</span>
+        </div>
+      </div>
+      <div style="font-size:11px;color:#64748B;display:flex;gap:6px"><span style="color:#E8C872">Mitigação:</span>${f.mitigacao||''}</div>
+    </div>`;
+  }).join('') : '';
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mapa de Cenários — ${sessionName}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0A0C10;font-family:Arial,sans-serif;padding:32px;color:#E8E9EC}
+.page{max-width:1100px;margin:0 auto}
+h1{font-family:Georgia,serif;color:#E8C872;font-size:22px;margin-bottom:4px}
+.sub{color:#64748B;font-size:12px;margin-bottom:20px}
+.decisao{background:#0F1B35;border-radius:12px;padding:16px 20px;margin-bottom:24px;border:1px solid rgba(232,200,114,.2);display:flex;align-items:center;gap:12px}
+.dec-icon{font-size:24px}
+.dec-label{font-size:10px;color:#64748B;letter-spacing:.1em;text-transform:uppercase;margin-bottom:3px}
+.dec-text{font-size:15px;font-weight:600;color:#E8C872}
+.section-title{font-size:10px;font-weight:700;letter-spacing:.12em;color:#64748B;text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.section-title::after{content:'';flex:1;height:1px;background:#1E2535}
+.cenarios{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:28px}
+.fatores{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-bottom:24px}
+footer{text-align:center;font-size:11px;color:#334155;margin-top:28px;padding-top:14px;border-top:1px solid #1E2535}
+</style>
+</head>
+<body>
+<div class="page">
+<h1>Mapa de Cenários — ${sessionName}</h1>
+<div class="sub">${today} · Colink Business Consulting · Análise de Probabilidades e Riscos</div>
+<div class="decisao">
+  <div class="dec-icon">🎲</div>
+  <div><div class="dec-label">Decisão central analisada</div><div class="dec-text">${decisao}</div></div>
+</div>
+<div class="section-title">Cenários e probabilidades</div>
+<div class="cenarios">${cenariosHTML}</div>
+${fatores.length > 0 ? `<div class="section-title">Fatores críticos de sucesso</div><div class="fatores">${fatoresHTML}</div>` : ''}
+<footer>Colink Business Consulting · colink.com.br · ${today}</footer>
+</div>
+</body>
+</html>`;
+}
+
+
+showSessionModal();
+loadSessionList();
+
+showSessionModal();
+loadSessionList();
+</script>
+</body>
+</html>
